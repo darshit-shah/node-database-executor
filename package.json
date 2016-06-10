@@ -1,0 +1,23 @@
+{
+  "name": "node-database-executor",
+  "version": "1.0.1",
+  "description": "",
+  "main": "MySQLExecutor.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/darshit-shah/node-database-executor.git"
+  },
+  "author": "darshit@byteprophecy.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/darshit-shah/node-database-executor/issues"
+  },
+  "dependencies": {
+    "node-database-connectors": "*",
+    "debug": "*"
+  },
+  "homepage": "https://github.com/darshit-shah/node-database-executor#readme"
+}
