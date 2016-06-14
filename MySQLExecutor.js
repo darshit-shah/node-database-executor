@@ -127,7 +127,7 @@ exports.executeQuery = function(requestData, cb) {
 exports.executeQueryStream = function(requestData, onResultFunction, cb) {
   var dbConfig = requestData.dbConfig;
   var query = requestData.rawQuery;
-  console.log(JSON.stringify(dbConfig));
+  debug(dbConfig);
   var objConnection = connectionIdentifier.identify(dbConfig);
   objConnection.connect(dbConfig, function(err, connection) {
     if (err != undefined) {
@@ -196,8 +196,7 @@ function executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb) {
               error: e
             });
           } else {
-            console.log("Total Time:", (new Date().getTime() - startTime.getTime())/1000, "Query Time:", (new Date().getTime() - queryStartTime.getTime())/1000);
-            //console.log("Query:", rawQuery);
+            debug("Total Time:", (new Date().getTime() - startTime.getTime())/1000, "Query Time:", (new Date().getTime() - queryStartTime.getTime())/1000);
             cb({
               status: true,
               content:results
@@ -220,11 +219,11 @@ function executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb) {
 
 function executeRawQuery(dbConfig, rawQuery, cb){
   if(dbConfig.hasOwnProperty('connectionLimit') && dbConfig.connectionLimit == 0){
-    console.log("With New Connection");
+    debug("With New Connection");
     executeRawQueryWithConnection(dbConfig, rawQuery, cb);
   }
   else {
-    console.log("With Connection Pool");
+    debug("With Connection Pool");
     executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb);
   }
 }

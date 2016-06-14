@@ -1,6 +1,6 @@
 {
   "name": "node-database-executor",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "",
   "main": "MySQLExecutor.js",
   "scripts": {
