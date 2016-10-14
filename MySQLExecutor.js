@@ -103,15 +103,17 @@ function executeRawQueryWithConnection(dbConfig, rawQuery, cb) {
   }
 }
 
-exports.executeRawQuery = function(requestData, cb) {
-  debug('dbcon req:\nrequestData: %s', JSON.stringify(requestData));
+//VRP : Deleted "exports.prepareQuery" method as we dont want to expose this method from this module
+
+exports.executeRawQuery = function(requestData, connection, cb) {
+  // debug('dbcon req:\nrequestData: %s\nconnection: %s ', JSON.stringify(requestData), JSON.stringify(connection));
   var dbConfig = requestData.dbConfig;
   var rawQuery = requestData.query;
   executeRawQuery(dbConfig, rawQuery, cb);
 }
 
-exports.executeQuery = function(requestData, cb) {
-  //debug('dbcon req:\nrequestData: %s', JSON.stringify(requestData));
+exports.executeQuery = function(requestData, connection, cb) {
+  //debug('dbcon req:\nrequestData: %s\nconnection: %s ', JSON.stringify(requestData), JSON.stringify(connection));
   var dbConfig = requestData.dbConfig;
   var queryConfig = requestData.query;
   prepareQuery(dbConfig, queryConfig, function(data) {
