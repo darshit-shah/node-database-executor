@@ -41,7 +41,7 @@ function executeRawQueryWithConnection(dbConfig, rawQuery, cb) {
         var objExecutor = databaseExecutor.identify(dbConfig);
         objExecutor.executeQuery(connection, rawQuery, function(result) {
           debug('connection closed');
-          connection.end();
+          objConnection.disconnect();
           cb(result);
         });
         // //debug('connection opened');
@@ -122,7 +122,7 @@ exports.executeQuery = function(requestData, cb) {
   var dbConfig = requestData.dbConfig;
   var queryConfig = requestData.query;
   prepareQuery(dbConfig, queryConfig, function(data) {
-    debug('executeQuery', data);
+    debug('prepareQuery', data);
     if (data.status == true) {
       executeRawQuery(dbConfig, data.content, cb);
     } else {
@@ -197,6 +197,9 @@ function executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb) {
         var queryStartTime = new Date();
         var objExecutor = databaseExecutor.identify(dbConfig);
         objExecutor.executeQuery(connection, rawQuery, function(result) {
+	 if(result.status == false){
+            console.log("DB Executor Error",dbConfig,rawQuery);
+          }
           debug("Total Time:", (new Date().getTime() - startTime.getTime()) / 1000, "Query Time:", (new Date().getTime() - queryStartTime.getTime()) / 1000);
           cb(result);
         });
