@@ -41,7 +41,7 @@ function executeRawQueryWithConnection(dbConfig, rawQuery, cb) {
         var objExecutor = databaseExecutor.identify(dbConfig);
         objExecutor.executeQuery(connection, rawQuery, function(result) {
           debug('connection closed');
-          objConnection.disconnect();
+          objConnection.disconnect(connection);
           cb(result);
         });
         // //debug('connection opened');
