@@ -27,6 +27,7 @@ function prepareQuery(dbConfig, queryConfig, cb) {
 
 function executeRawQueryWithConnection(dbConfig, rawQuery, cb) {
   try {
+    debug("In DBEXceutor---------------",dbConfig)
     var objConnection = databaseConnector.identify(dbConfig);
     objConnection.connect(dbConfig, function(err, connection) {
       if (err != undefined) {
@@ -197,8 +198,8 @@ function executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb) {
         var queryStartTime = new Date();
         var objExecutor = databaseExecutor.identify(dbConfig);
         objExecutor.executeQuery(connection, rawQuery, function(result) {
-	 if(result.status == false){
-            console.log("DB Executor Error",dbConfig,rawQuery);
+          if (result.status == false) {
+            console.log("DB Executor Error", dbConfig, rawQuery);
           }
           debug("Total Time:", (new Date().getTime() - startTime.getTime()) / 1000, "Query Time:", (new Date().getTime() - queryStartTime.getTime()) / 1000);
           cb(result);
@@ -233,6 +234,7 @@ function executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb) {
 
 
 function executeRawQuery(dbConfig, rawQuery, cb) {
+  debug("In EXEC raw QUERY ", dbConfig)
   if (dbConfig.hasOwnProperty('connectionLimit') && dbConfig.connectionLimit == 0) {
     debug("With New Connection");
     executeRawQueryWithConnection(dbConfig, rawQuery, cb);
