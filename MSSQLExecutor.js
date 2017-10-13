@@ -16,7 +16,7 @@ function executeQuery(connection, rawQuery, cb) {
     } else {
       cb({
         status: true,
-        content: results
+        content: results.recordsets
       });
     }
   });
