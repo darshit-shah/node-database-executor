@@ -1,6 +1,6 @@
 {
   "name": "node-database-executor",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "",
   "main": "DatabaseExecutor.js",
   "scripts": {
