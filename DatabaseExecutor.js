@@ -1,10 +1,10 @@
 var debug = require('debug')('database-executor:database-executor');
 var databaseConnector = require('node-database-connectors');
 var databaseExecutor = require('./ConnectorIdentifier.js');
-
-if (GLOBAL._connectionPools == null) {
-  GLOBAL._connectionPools = {};
-}
+  if (GLOBAL._connectionPools == null) {
+    GLOBAL._connectionPools = {};
+  }
+var oldResults = {};
 
 function prepareQuery(dbConfig, queryConfig, cb) {
   try {
@@ -27,7 +27,7 @@ function prepareQuery(dbConfig, queryConfig, cb) {
 
 function executeRawQueryWithConnection(dbConfig, rawQuery, cb) {
   try {
-    debug("In DBEXceutor---------------",dbConfig)
+    debug("In DBEXceutor---------------", dbConfig)
     var objConnection = databaseConnector.identify(dbConfig);
     objConnection.connect(dbConfig, function(err, connection) {
       if (err != undefined) {
@@ -115,17 +115,20 @@ exports.executeRawQuery = function(requestData, cb) {
   debug('dbcon req:\nrequestData: %s', JSON.stringify(requestData));
   var dbConfig = requestData.dbConfig;
   var rawQuery = requestData.query;
-  executeRawQuery(dbConfig, rawQuery, cb);
+  var shouldCache = requestData.hasOwnProperty('shouldCache') ? requestData.shouldCache:false;
+  executeRawQuery(dbConfig, rawQuery,shouldCache, cb);
 }
 
 exports.executeQuery = function(requestData, cb) {
   //debug('dbcon req:\nrequestData: %s', JSON.stringify(requestData));
   var dbConfig = requestData.dbConfig;
   var queryConfig = requestData.query;
+  var shouldCache = requestData.hasOwnProperty('shouldCache') ? requestData.shouldCache:false;
+  
   prepareQuery(dbConfig, queryConfig, function(data) {
     debug('prepareQuery', data);
     if (data.status == true) {
-      executeRawQuery(dbConfig, data.content, cb);
+      executeRawQuery(dbConfig, data.content,shouldCache, cb);
     } else {
       cb(data);
     }
@@ -233,14 +236,30 @@ function executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb) {
 }
 
 
-function executeRawQuery(dbConfig, rawQuery, cb) {
+function executeRawQuery(dbConfig, rawQuery, shouldCache, cb) {
   debug("In EXEC raw QUERY ", dbConfig)
-  if (dbConfig.hasOwnProperty('connectionLimit') && dbConfig.connectionLimit == 0) {
-    debug("With New Connection");
-    executeRawQueryWithConnection(dbConfig, rawQuery, cb);
+  if (shouldCache == true && oldResults[JSON.stringify(dbConfig)] && oldResults[JSON.stringify(dbConfig)][rawQuery]) {
+    debug("RETURNING from cache for query::: ",rawQuery)
+    debug("**********************************************************##############################***********************")
+    cb({ status: true, content: oldResults[JSON.stringify(dbConfig)][rawQuery].result })
   } else {
-    debug("With Connection Pool");
-    executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb);
+    if (dbConfig.hasOwnProperty('connectionLimit') && dbConfig.connectionLimit == 0) {
+      debug("With New Connection");
+      executeRawQueryWithConnection(dbConfig, rawQuery, function(responseData) {
+        cb(responseData)
+        if (shouldCache == true && responseData.status == true) {
+          saveToCache(responseData.content, dbConfig, rawQuery)
+        }
+      });
+    } else {
+      debug("With Connection Pool");
+      executeRawQueryWithConnectionPool(dbConfig, rawQuery, function(responseData) {
+        cb(responseData)
+        if (shouldCache == true && responseData.status == true) {
+          saveToCache(responseData.content, dbConfig, rawQuery)
+        }
+      });
+    }
   }
 }
 
@@ -284,3 +303,20 @@ function getConnectionFromPool(dbConfig, cb) {
     });
   }
 }
+
+
+function saveToCache(finalData, dbConf, queryString) {
+  dbConf = JSON.stringify(dbConf);
+  if (!oldResults[dbConf]) {
+    oldResults[dbConf] = {};
+  }
+  oldResults[dbConf][queryString] = {
+    result: JSON.parse(JSON.stringify(finalData))
+  };
+  // console.log("################################## JSON.stringify(oldResults) ###########################################")
+  // console.log(JSON.stringify(oldResults))
+  // console.log("################################## JSON.stringify(oldResults) ###########################################")
+  
+}
+
+
