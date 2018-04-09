@@ -15,7 +15,7 @@ function prepareQuery(dbConfig, queryConfig, cb) {
       content: query
     });
   } catch (ex) {
-    debug('exception: ', ex);
+    console.log('exception: ', ex);
     var e = ex;
     //e.exception=ex;
     cb({
@@ -27,11 +27,10 @@ function prepareQuery(dbConfig, queryConfig, cb) {
 
 function executeRawQueryWithConnection(dbConfig, rawQuery, cb) {
   try {
-    debug("In DBEXceutor---------------", dbConfig)
     var objConnection = databaseConnector.identify(dbConfig);
     objConnection.connect(dbConfig, function(err, connection) {
       if (err != undefined) {
-        debug('connection error: ', err);
+        console.log('connection error: ', err);
         var e = err;
         //e.exception=ex;
         cb({
@@ -41,7 +40,6 @@ function executeRawQueryWithConnection(dbConfig, rawQuery, cb) {
       } else {
         var objExecutor = databaseExecutor.identify(dbConfig);
         objExecutor.executeQuery(connection, rawQuery, function(result) {
-          debug('connection closed');
           objConnection.disconnect(connection);
           cb(result);
         });
@@ -101,7 +99,7 @@ function executeRawQueryWithConnection(dbConfig, rawQuery, cb) {
       }
     });
   } catch (ex) {
-    debug('exception: ', ex);
+    console.log('exception: ', ex);
     var e = ex;
     //e.exception=ex;
     cb({
@@ -126,7 +124,7 @@ exports.executeQuery = function(requestData, cb) {
   var shouldCache = requestData.hasOwnProperty('shouldCache') ? requestData.shouldCache:false;
   
   prepareQuery(dbConfig, queryConfig, function(data) {
-    debug('prepareQuery', data);
+//     debug('prepareQuery', data);
     if (data.status == true) {
       executeRawQuery(dbConfig, data.content,shouldCache, cb);
     } else {
@@ -138,11 +136,10 @@ exports.executeQuery = function(requestData, cb) {
 exports.executeQueryStream = function(requestData, onResultFunction, cb) {
   var dbConfig = requestData.dbConfig;
   var query = requestData.rawQuery;
-  debug(dbConfig);
   var objConnection = databaseConnector.identify(dbConfig);
   objConnection.connect(dbConfig, function(err, connection) {
     if (err != undefined) {
-      debug('connection error: ', err);
+      console.log('connection error: ', err);
       var e = err;
       //e.exception=ex;
       cb({
@@ -225,7 +222,7 @@ function executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb) {
       }
     });
   } catch (ex) {
-    debug('exception: ', ex);
+    console.log('exception: ', ex);
     var e = ex;
     //e.exception=ex;
     cb({
@@ -237,7 +234,6 @@ function executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb) {
 
 
 function executeRawQuery(dbConfig, rawQuery, shouldCache, cb) {
-  debug("In EXEC raw QUERY ", dbConfig)
   if (shouldCache == true && oldResults[JSON.stringify(dbConfig)] && oldResults[JSON.stringify(dbConfig)][rawQuery]) {
     debug("RETURNING from cache for query::: ",rawQuery)
     debug("**********************************************************##############################***********************")
@@ -277,7 +273,7 @@ function getConnectionFromPool(dbConfig, cb) {
       var objConnection = databaseConnector.identify(dbConfig);
       objConnection.connectPool(dbConfig, function(err, pool) {
         if (err != undefined) {
-          debug('connection error: ', err);
+          console.log('connection error: ', err);
           var e = err;
           //e.exception=ex;
           cb({
@@ -294,7 +290,7 @@ function getConnectionFromPool(dbConfig, cb) {
       });
     }
   } catch (ex) {
-    debug('exception: ', ex);
+    console.log('exception: ', ex);
     var e = ex;
     //e.exception=ex;
     cb({

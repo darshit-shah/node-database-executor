@@ -1,4 +1,4 @@
-var debug = require('debug')('database-executor:database-executor');
+var debug = require('debug')('database-executor:clickhouse-executor');
 var dbConnector = require('node-database-connectors')
 
 // exports.executeRawQuery = function(requestData, cb) {

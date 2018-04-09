@@ -1,4 +1,4 @@
-var debug = require('debug')('database-executor:database-executor');
+var debug = require('debug')('database-executor:mysql-executor');
 function executeQuery(connection, rawQuery, cb) {
   if (rawQuery.length <= 100000000) {
     debug('query: %s', rawQuery);
