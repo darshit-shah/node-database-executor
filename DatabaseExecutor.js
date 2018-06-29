@@ -1,9 +1,10 @@
 var debug = require('debug')('database-executor:database-executor');
 var databaseConnector = require('node-database-connectors');
 var databaseExecutor = require('./ConnectorIdentifier.js');
-  if (GLOBAL._connectionPools == null) {
-    GLOBAL._connectionPools = {};
-  }
+var axiomUtils = require("axiom-utils");
+if (GLOBAL._connectionPools == null) {
+  GLOBAL._connectionPools = {};
+}
 var oldResults = {};
 
 function prepareQuery(dbConfig, queryConfig, cb) {
@@ -43,59 +44,6 @@ function executeRawQueryWithConnection(dbConfig, rawQuery, cb) {
           objConnection.disconnect(connection);
           cb(result);
         });
-        // //debug('connection opened');
-        // connection.beginTransaction(function(err) {
-        //   if (err) {
-        //     debug("beginTransaction", err);
-        //     cb({
-        //       status: false,
-        //       error: err
-        //     });
-        //   } else {
-        //     if(rawQuery.length<=100000000){
-        //       debug('query: %s', rawQuery);
-        //     }
-        //     else {
-        //       debug('query: %s', rawQuery.substring(0,500)+"\n...\n"+rawQuery.substring(rawQuery.length-500, rawQuery.length));
-        //     }
-        //     connection.query(rawQuery, function(err, results) {
-        //       if (err) {
-        //         debug("query", err);
-        //         connection.rollback(function() {
-        //           var e = err;
-        //           //e.exception = err;
-        //           cb({
-        //             status: false,
-        //             error: e
-        //           });
-        //           connection.end();
-        //         });
-        //       } else {
-        //         connection.commit(function(err) {
-        //           if (err) {
-        //             debug("commit", err);
-        //             connection.rollback(function() {
-        //               var e = err;
-        //               //e.exception = err;
-        //               cb({
-        //                 status: false,
-        //                 error: e
-        //               });
-        //               connection.end();
-        //             });
-        //           } else {
-        //             //debug('connection closed');
-        //             cb({
-        //               status: true,
-        //               content:results
-        //             });
-        //             connection.end();
-        //           }
-        //         });
-        //       }
-        //     });
-        //   }
-        // });
       }
     });
   } catch (ex) {
@@ -110,23 +58,24 @@ function executeRawQueryWithConnection(dbConfig, rawQuery, cb) {
 }
 
 exports.executeRawQuery = function(requestData, cb) {
-  debug('dbcon req:\nrequestData: %s', JSON.stringify(requestData));
+  // debug('dbcon req:\nrequestData: %s', JSON.stringify(requestData));
   var dbConfig = requestData.dbConfig;
   var rawQuery = requestData.query;
-  var shouldCache = requestData.hasOwnProperty('shouldCache') ? requestData.shouldCache:false;
-  executeRawQuery(dbConfig, rawQuery,shouldCache, cb);
+  var tableName = requestData.table;
+  var shouldCache = requestData.hasOwnProperty('shouldCache') ? requestData.shouldCache : false;
+  executeRawQuery(dbConfig, rawQuery, shouldCache, tableName, cb);
 }
 
 exports.executeQuery = function(requestData, cb) {
   //debug('dbcon req:\nrequestData: %s', JSON.stringify(requestData));
   var dbConfig = requestData.dbConfig;
   var queryConfig = requestData.query;
-  var shouldCache = requestData.hasOwnProperty('shouldCache') ? requestData.shouldCache:false;
-  
+  var shouldCache = requestData.hasOwnProperty('shouldCache') ? requestData.shouldCache : false;
+
   prepareQuery(dbConfig, queryConfig, function(data) {
-//     debug('prepareQuery', data);
+    //     debug('prepareQuery', data);
     if (data.status == true) {
-      executeRawQuery(dbConfig, data.content,shouldCache, cb);
+      executeRawQuery(dbConfig, data.content, shouldCache, queryConfig.table, cb);
     } else {
       cb(data);
     }
@@ -149,32 +98,6 @@ exports.executeQueryStream = function(requestData, onResultFunction, cb) {
     } else {
       var objExecutor = databaseExecutor.identify(dbConfig);
       objExecutor.executeQueryStream(connection, query, onResultFunction, cb);
-      // var queryExecutor = connection.query(query);
-      // queryExecutor
-      //   .on('error', function(err) {
-      //     cb({
-      //       status: false,
-      //       error: err
-      //     });
-      //     // Handle error, an 'end' event will be emitted after this as well
-      //   })
-      //   .on('fields', function(fields) {
-      //     // the field packets for the rows to follow
-      //   })
-      //   .on('result', function(row) {
-      //     // Pausing the connnection is useful if your processing involves I/O
-      //     connection.pause();
-
-      //     onResultFunction(row, function() {
-      //       connection.resume();
-      //     });
-      //   })
-      //   .on('end', function() {
-      //     cb({
-      //       status: true
-      //     });
-
-      //   });
     }
   });
 }
@@ -204,21 +127,6 @@ function executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb) {
           debug("Total Time:", (new Date().getTime() - startTime.getTime()) / 1000, "Query Time:", (new Date().getTime() - queryStartTime.getTime()) / 1000);
           cb(result);
         });
-        // connection.query(rawQuery, function(err, results) {
-        //   if (err) {
-        //     debug("query", err);
-        //     var e = err;
-        //     cb({
-        //       status: false,
-        //       error: e
-        //     });
-        //   } else {
-        //     cb({
-        //       status: true,
-        //       content: results
-        //     });
-        //   }
-        // });
       }
     });
   } catch (ex) {
@@ -233,18 +141,19 @@ function executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb) {
 }
 
 
-function executeRawQuery(dbConfig, rawQuery, shouldCache, cb) {
-  if (shouldCache == true && oldResults[JSON.stringify(dbConfig)] && oldResults[JSON.stringify(dbConfig)][rawQuery]) {
-    debug("RETURNING from cache for query::: ",rawQuery)
-    debug("**********************************************************##############################***********************")
-    cb({ status: true, content: oldResults[JSON.stringify(dbConfig)][rawQuery].result })
+function executeRawQuery(dbConfig, rawQuery, shouldCache, tableName, cb) {
+  if (!tableName) {
+    tableName = "#$table_name_not_available$#";
+  }
+  if (shouldCache == true && oldResults[JSON.stringify(dbConfig)] && oldResults[JSON.stringify(dbConfig)][tableName] && oldResults[JSON.stringify(dbConfig)][tableName][rawQuery]) {
+    cb({ status: true, content: oldResults[JSON.stringify(dbConfig)][tableName][rawQuery].result })
   } else {
     if (dbConfig.hasOwnProperty('connectionLimit') && dbConfig.connectionLimit == 0) {
       debug("With New Connection");
       executeRawQueryWithConnection(dbConfig, rawQuery, function(responseData) {
         cb(responseData)
         if (shouldCache == true && responseData.status == true) {
-          saveToCache(responseData.content, dbConfig, rawQuery)
+          saveToCache(responseData.content, dbConfig, rawQuery, tableName)
         }
       });
     } else {
@@ -252,7 +161,7 @@ function executeRawQuery(dbConfig, rawQuery, shouldCache, cb) {
       executeRawQueryWithConnectionPool(dbConfig, rawQuery, function(responseData) {
         cb(responseData)
         if (shouldCache == true && responseData.status == true) {
-          saveToCache(responseData.content, dbConfig, rawQuery)
+          saveToCache(responseData.content, dbConfig, rawQuery, tableName)
         }
       });
     }
@@ -301,18 +210,29 @@ function getConnectionFromPool(dbConfig, cb) {
 }
 
 
-function saveToCache(finalData, dbConf, queryString) {
+function saveToCache(finalData, dbConf, queryString, tableName) {
   dbConf = JSON.stringify(dbConf);
   if (!oldResults[dbConf]) {
     oldResults[dbConf] = {};
   }
-  oldResults[dbConf][queryString] = {
-    result: JSON.parse(JSON.stringify(finalData))
+  if (!oldResults[dbConf][tableName]) {
+    oldResults[dbConf][tableName] = {}
+  }
+  oldResults[dbConf][tableName][queryString] = {
+    result: axiomUtils.extend(true, [], finalData)
   };
   // console.log("################################## JSON.stringify(oldResults) ###########################################")
   // console.log(JSON.stringify(oldResults))
   // console.log("################################## JSON.stringify(oldResults) ###########################################")
-  
+
 }
 
 
+exports.flushCache = function(dbConfig, tableName) {
+  dbConfig = JSON.stringify(dbConfig);
+  if (oldResults[dbConfig]) {
+    if (oldResults[dbConfig][tableName]) {
+      oldResults[dbConfig][tableName] = {};
+    }
+  }
+}
