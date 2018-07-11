@@ -17,6 +17,8 @@ function identifyConnection(json) {
       objConnection = require('./CassandraExecutor.js');
     } else if (json.databaseType == "clickhouse") {
       objConnection = require('./ClickhouseExecutor.js');
+    } else if (json.databaseType == "redshift") {
+      objConnection = require('./RedShiftExecutor.js');
     }
     /*else if (json.databaseType == "mssql") {
         objConnection = require('./MSSQLConnector.js');
