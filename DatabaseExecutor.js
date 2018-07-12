@@ -210,8 +210,8 @@ function getConnectionFromPool(dbConfig, cb) {
 }
 
 
-function saveToCache(finalData, dbConf, queryString, tableName) {
-  dbConf = JSON.stringify(dbConf);
+function saveToCache(finalData, dbConfig, queryString, tableName) {
+  var dbConf = JSON.stringify({host:dbConfig.host,port:dbConfig.port});
   if (!oldResults[dbConf]) {
     oldResults[dbConf] = {};
   }
@@ -229,10 +229,10 @@ function saveToCache(finalData, dbConf, queryString, tableName) {
 
 
 exports.flushCache = function(dbConfig, tableName) {
-  dbConfig = JSON.stringify(dbConfig);
-  if (oldResults[dbConfig]) {
-    if (oldResults[dbConfig][tableName]) {
-      oldResults[dbConfig][tableName] = {};
+  var dbConf = JSON.stringify({host:dbConfig.host,port:dbConfig.port});
+  if (oldResults[dbConf]) {
+    if (oldResults[dbConf][tableName]) {
+      oldResults[dbConf][tableName] = {};
     }
   }
 }
