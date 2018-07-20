@@ -145,8 +145,19 @@ function executeRawQuery(dbConfig, rawQuery, shouldCache, tableName, cb) {
   if (!tableName) {
     tableName = "#$table_name_not_available$#";
   }
-  if (shouldCache == true && oldResults[JSON.stringify(dbConfig)] && oldResults[JSON.stringify(dbConfig)][tableName] && oldResults[JSON.stringify(dbConfig)][tableName][rawQuery]) {
-    cb({ status: true, content: oldResults[JSON.stringify(dbConfig)][tableName][rawQuery].result })
+  var dbConf = JSON.stringify({host:dbConfig.host,port:dbConfig.port});
+  if (shouldCache == true && oldResults[dbConf] && oldResults[dbConf][tableName] && oldResults[dbConf][tableName][rawQuery]) {
+    var result = oldResults[dbConf][tableName][rawQuery].result;
+    if(dbConfig.databaseType == 'redshift'){
+      result = result.map(d => {
+        return (!Array.isArray(d) ? convertObject(d) : d.map(innerD => {
+          return convertObject(innerD);
+        }));
+      });
+    }else{
+      result = axiomUtils.extend(true,[],result);
+    }
+    cb({ status: true, content: result });
   } else {
     if (dbConfig.hasOwnProperty('connectionLimit') && dbConfig.connectionLimit == 0) {
       debug("With New Connection");
@@ -210,8 +221,8 @@ function getConnectionFromPool(dbConfig, cb) {
 }
 
 
-function saveToCache(finalData, dbConf, queryString, tableName) {
-  dbConf = JSON.stringify(dbConf);
+function saveToCache(finalData, dbConfig, queryString, tableName) {
+  var dbConf = JSON.stringify({host:dbConfig.host,port:dbConfig.port});
   if (!oldResults[dbConf]) {
     oldResults[dbConf] = {};
   }
@@ -219,7 +230,7 @@ function saveToCache(finalData, dbConf, queryString, tableName) {
     oldResults[dbConf][tableName] = {}
   }
   oldResults[dbConf][tableName][queryString] = {
-    result: axiomUtils.extend(true, [], finalData)
+    result: finalData
   };
   // console.log("################################## JSON.stringify(oldResults) ###########################################")
   // console.log(JSON.stringify(oldResults))
@@ -229,10 +240,30 @@ function saveToCache(finalData, dbConf, queryString, tableName) {
 
 
 exports.flushCache = function(dbConfig, tableName) {
-  dbConfig = JSON.stringify(dbConfig);
-  if (oldResults[dbConfig]) {
-    if (oldResults[dbConfig][tableName]) {
-      oldResults[dbConfig][tableName] = {};
+  var dbConf = JSON.stringify({host:dbConfig.host,port:dbConfig.port});
+  if (oldResults[dbConf]) {
+    if (oldResults[dbConf][tableName]) {
+      oldResults[dbConf][tableName] = {};
     }
   }
+}
+
+function convertObject(row) {
+  return new Proxy(row, {
+    get: function(target, name) {
+      if (typeof name !== 'string') {
+        return undefined;
+      }
+      if (!(name.toLowerCase() in target)) {
+        return undefined;
+      }
+      return target[name.toLowerCase()];
+    },
+    set: function(target, name, value) {
+      if (typeof name !== 'string') {
+        return undefined;
+      }
+      target[name.toLowerCase()] = value;
+    }
+  });
 }
