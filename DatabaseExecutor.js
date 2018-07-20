@@ -145,8 +145,8 @@ function executeRawQuery(dbConfig, rawQuery, shouldCache, tableName, cb) {
   if (!tableName) {
     tableName = "#$table_name_not_available$#";
   }
-  if (shouldCache == true && oldResults[JSON.stringify(dbConfig)] && oldResults[JSON.stringify(dbConfig)][tableName] && oldResults[JSON.stringify(dbConfig)][tableName][rawQuery]) {
-    var result = oldResults[JSON.stringify(dbConfig)][tableName][rawQuery].result;
+  if (shouldCache == true && oldResults[JSON.stringify({host:dbConfig.host,port:dbConfig.port})] && oldResults[JSON.stringify({host:dbConfig.host,port:dbConfig.port})][tableName] && oldResults[JSON.stringify({host:dbConfig.host,port:dbConfig.port})][tableName][rawQuery]) {
+    var result = oldResults[JSON.stringify({host:dbConfig.host,port:dbConfig.port})][tableName][rawQuery].result;
     if(dbConfig.databaseType == 'redshift'){
       result = result.map(d => {
         return (!Array.isArray(d) ? convertObject(d) : d.map(innerD => {
