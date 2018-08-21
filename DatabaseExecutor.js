@@ -267,3 +267,57 @@ function convertObject(row) {
     }
   });
 }
+
+function executeRawQueriesWithSpecificConnection(dbConfig, connection, queries, cb){
+  var objExecutor = databaseExecutor.identify(dbConfig);
+  var allErrs = [], allResults = [], allFields = [];
+  function processQuery(index){
+    if(index>=queries.length || (allErrs.length && allErrs[allErrs.length-1])){
+      cb(allErrs, allResults, allFields);
+      return;
+    }
+    objExecutor.executeQuery(connection, queries[index], function(result) {
+      if(result.status){
+        allErrs.push(null);
+        allResults.push(result.content);
+      } else {
+        allErrs.push(result.error);
+        allResults.push(null);
+      }
+      allFields.push(null);
+      processQuery(index + 1);
+    });
+  }
+  processQuery(0);
+}
+exports.executeRawQueriesWithConnection = function(requestData, cb) {
+  try {
+    var dbConfig = requestData.dbConfig;
+    var rawQueries = requestData.rawQueries;
+    var objConnection = databaseConnector.identify(dbConfig);
+    objConnection.connect(dbConfig, function(err, connection) {
+      if (err != undefined) {
+        console.log('connection error: ', err);
+        var e = err;
+        //e.exception=ex;
+        cb({
+          status: false,
+          error: e
+        });
+      } else {
+        executeRawQueriesWithSpecificConnection(dbConfig, connection, rawQueries, function(allErrs, allResults, allFields){
+          objConnection.disconnect(connection);
+          cb(allErrs, allResults, allFields);
+        });
+      }
+    });
+  } catch (ex) {
+    console.log('exception: ', ex);
+    var e = ex;
+    //e.exception=ex;
+    cb({
+      status: false,
+      error: e
+    });
+  }
+}
