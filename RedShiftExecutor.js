@@ -2,7 +2,7 @@ var debug = require('debug')('database-executor:redshift-executor');
 
 function updateQueryAsPerRedShiftSyntax(query) {
 
-  query = query.replace(/`.`/g, "");
+  query = query.replace(/`\.`/g, "");
   query = query.replace(/`/g, '"');
 
   var limitMatch = query.toLowerCase().match(new RegExp(/limit [0-9]+,[0-9]+[;]*/ig));
