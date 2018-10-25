@@ -1,4 +1,5 @@
 var debug = require('debug')('database-executor:redshift-executor');
+var axiom_utils = require("axiom-utils");
 
 function updateQueryAsPerRedShiftSyntax(query) {
 
@@ -17,13 +18,13 @@ function updateQueryAsPerRedShiftSyntax(query) {
 }
 
 function executeQuery(connection, rawQuery, cb) {
+  rawQuery = updateQueryAsPerRedShiftSyntax(rawQuery);
   if (rawQuery.length <= 100000000) {
     debug('query: %s', rawQuery);
   } else {
     debug('query: %s', rawQuery.substring(0, 500) + "\n...\n" + rawQuery.substring(rawQuery.length - 500, rawQuery.length));
   }
 
-  rawQuery = updateQueryAsPerRedShiftSyntax(rawQuery);
 
   connection.query(rawQuery, function(err, results) {
     if (err) {
@@ -37,8 +38,8 @@ function executeQuery(connection, rawQuery, cb) {
       cb({
         status: true,
         content: results.rows.map(d => {
-          return (!Array.isArray(d) ? convertObject(d) : d.map(innerD => {
-            return convertObject(innerD);
+          return (!Array.isArray(d) ? axiom_utils.convertObjectKeysCaseInsensitive(d) : d.map(innerD => {
+            return axiom_utils.convertObjectKeysCaseInsensitive(innerD);
           }));
         })
       });
@@ -65,7 +66,7 @@ function executeQueryStream(connection, query, onResultFunction, cb) {
       // Pausing the connnection is useful if your processing involves I/O
       connection.pause();
 
-      onResultFunction(convertObject(row), function() {
+      onResultFunction(axiom_utils.convertObjectKeysCaseInsensitive(row), function() {
         connection.resume();
       });
     })
@@ -77,28 +78,9 @@ function executeQueryStream(connection, query, onResultFunction, cb) {
     });
 }
 
-function convertObject(row) {
-  return new Proxy(row, {
-    get: function(target, name) {
-      if (typeof name !== 'string') {
-        return undefined;
-      }
-      if (!(name.toLowerCase() in target)) {
-        return undefined;
-      }
-      return target[name.toLowerCase()];
-    },
-    set: function(target, name, value) {
-      if (typeof name !== 'string') {
-        return undefined;
-      }
-      target[name.toLowerCase()] = value;
-    }
-  });
-}
-
 module.exports = {
   executeQuery: executeQuery,
   executeQueryStream: executeQueryStream
 }
+
 
