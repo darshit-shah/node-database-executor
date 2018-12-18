@@ -2,8 +2,8 @@ var debug = require('debug')('database-executor:database-executor');
 var databaseConnector = require('node-database-connectors');
 var databaseExecutor = require('./ConnectorIdentifier.js');
 var axiomUtils = require("axiom-utils");
-if (GLOBAL._connectionPools == null) {
-  GLOBAL._connectionPools = {};
+if (global._connectionPools == null) {
+  global._connectionPools = {};
 }
 var oldResults = {};
 
@@ -183,10 +183,10 @@ function executeRawQuery(dbConfig, rawQuery, shouldCache, tableName, cb) {
 function getConnectionFromPool(dbConfig, cb) {
   try {
     var connectionString = (dbConfig.databaseType + '://' + dbConfig.user + ':' + dbConfig.password + '@' + dbConfig.host + ':' + dbConfig.port + '/' + dbConfig.database);
-    if (GLOBAL._connectionPools.hasOwnProperty(connectionString)) {
+    if (global._connectionPools.hasOwnProperty(connectionString)) {
       cb({
         status: true,
-        content: GLOBAL._connectionPools[connectionString]
+        content: global._connectionPools[connectionString]
       });
       return;
     } else {
@@ -201,7 +201,7 @@ function getConnectionFromPool(dbConfig, cb) {
             error: e
           });
         } else {
-          GLOBAL._connectionPools[connectionString] = pool;
+          global._connectionPools[connectionString] = pool;
           cb({
             status: true,
             content: pool
