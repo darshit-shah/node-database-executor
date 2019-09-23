@@ -1,11 +1,13 @@
 var debug = require('debug')('database-executor:cassandra-executor');
+const driver = require('cassandra-driver')
+
 function executeQuery(connection, rawQuery,cb) {
   if (rawQuery.length <= 100000000) {
     debug('query: %s', rawQuery);
   } else {
     debug('query: %s', rawQuery.substring(0, 500) + "\n...\n" + rawQuery.substring(rawQuery.length - 500, rawQuery.length));
   }
-  connection.execute(rawQuery, function(err, results) {
+  connection.execute(rawQuery, undefined, {consistency: driver.types.consistencies.quorum}, function(err, results) {
     if (err) {
       debug("query", err);
       var e = err;
