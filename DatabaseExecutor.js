@@ -197,7 +197,7 @@ function executeRawQueryInner(dbConfig, rawQuery, shouldCache, tableName, cb) {
   if (!tableName) {
     tableName = '#$table_name_not_available$#';
   }
-  const dbConf = JSON.stringify({ host: dbConfig.host, port: dbConfig.port });
+  const dbConf = JSON.stringify({ host: dbConfig.host, port: dbConfig.port ? dbConfig.port.toString() : dbConfig.port });
   if (shouldCache == true && oldResults[dbConf] && oldResults[dbConf][tableName] && oldResults[dbConf][tableName][rawQuery]) {
     let result = oldResults[dbConf][tableName][rawQuery].result;
     if (dbConfig.databaseType == 'redshift') {
@@ -274,7 +274,7 @@ function getConnectionFromPool(dbConfig, cb) {
 }
 
 function saveToCache(finalData, dbConfig, queryString, tableName) {
-  const dbConf = JSON.stringify({ host: dbConfig.host, port: dbConfig.port });
+  const dbConf = JSON.stringify({ host: dbConfig.host, port: dbConfig.port ? dbConfig.port.toString() : dbConfig.port });
   if (!oldResults[dbConf]) {
     oldResults[dbConf] = {};
   }
@@ -284,13 +284,20 @@ function saveToCache(finalData, dbConfig, queryString, tableName) {
   oldResults[dbConf][tableName][queryString] = {
     result: finalData
   };
-  // console.log("################################## JSON.stringify(oldResults) ###########################################")
+  // console.log("################################## after saving JSON.stringify(oldResults) ###########################################")
   // console.log(JSON.stringify(oldResults))
-  // console.log("################################## JSON.stringify(oldResults) ###########################################")
+  // console.log("################################## after saving JSON.stringify(oldResults) ###########################################")
 }
 
- function flushCache(dbConfig, tableName) {
-  const dbConf = JSON.stringify({ host: dbConfig.host, port: dbConfig.port });
+function flushCache(dbConfig, tableName) {
+  const dbConf = JSON.stringify({ host: dbConfig.host, port: dbConfig.port ? dbConfig.port.toString() : dbConfig.port });
+  // console.log("################################## flush cache ###########################################")
+  // console.log({"oldResults": oldResults})
+  // console.log({"dbConf": dbConf});
+  // console.log({"dbConfig": dbConfig});
+  // console.log({"oldResults[dbConf]": oldResults[dbConf]});
+  // console.log({"tableName": tableName});
+  // console.log("################################## flush cache ###########################################")
   if (oldResults[dbConf]) {
     if (oldResults[dbConf][tableName]) {
       oldResults[dbConf][tableName] = {};
