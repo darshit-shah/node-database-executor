@@ -274,6 +274,11 @@ function getConnectionFromPool(dbConfig, cb) {
 }
 
 function saveToCache(finalData, dbConfig, queryString, tableName) {
+  if(dbConfig.databaseType!=null && dbConfig.databaseType.toString().toLowerCase()=='json'){
+    const errorMessage="Caching result is not supported in JSON type database, please set shouldCache to false or remove it";
+    console.error(errorMessage);
+    throw new Error(errorMessage);
+  }
   const dbConf = JSON.stringify({ host: dbConfig.host, port: dbConfig.port ? dbConfig.port.toString() : dbConfig.port });
   if (!oldResults[dbConf]) {
     oldResults[dbConf] = {};
