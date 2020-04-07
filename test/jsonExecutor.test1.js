@@ -5,7 +5,7 @@ const d3 = require("d3");
 async function runQuery() {
   try {
     const raw_data_databaseType_JSON = "json",
-      raw_data_file_path = "",
+      raw_data_file_path = "./data/",
       raw_data_file_name = "sampleData1.csv";
 
     const fileData1 = await fs.readFileSync(raw_data_file_path + "/" + raw_data_file_name, "utf8");
@@ -660,8 +660,8 @@ async function runQuery() {
     //CBT:select serialNumber,districtName from tableName where serialNumber>=1 and serialNumber<=10 order by serialNumber ,districtName ;
     //   console.log("jsonQueryData:",jsonQueryData);
 
-    const leftTableData = await fs.readFileSync(raw_data_file_path + "/leftJoinTable.csv", "utf8");
-    const rightTableData = await fs.readFileSync(raw_data_file_path + "/rightJoinTable.csv", "utf8");
+    const leftTableData = await fs.readFileSync(raw_data_file_path + "/sampleData2.csv", "utf8");
+    const rightTableData = await fs.readFileSync(raw_data_file_path + "/sampleData3.csv", "utf8");
     const dataSetLeft = utils.CSV2JSON(leftTableData, null, null, null, null, '"');
     const dataSetRight = utils.CSV2JSON(rightTableData, null, null, null, null, '"');
 
