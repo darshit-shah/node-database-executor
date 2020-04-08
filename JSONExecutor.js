@@ -44,7 +44,6 @@ function executeQuery(connection, rawQuery, cb) {
     });
   }
 
-
   //CBT:apply join on tables
   if(rawQuery.hasOwnProperty("join")) {
     const resultJoin=prepareDatafromJoin(rawQuery.join,rawQuery.select);
@@ -66,7 +65,7 @@ function executeQuery(connection, rawQuery, cb) {
       result = rawQuery.table;
     } else {
       //CBT:if query don't have any group by
-      if (!rawQuery.hasOwnProperty("groupby")) {
+      if (rawQuery.groupby==null  || (rawQuery.groupby!=null && Array.isArray(rawQuery.groupby)==true && rawQuery.groupby.length==0)) {
         const aggregatedData = getAggregationData(rawQuery.table, rawQuery.select);
         //CBT:select all fields from select which doesn't have aggregation key
         const fieldWithoutAggregation = rawQuery.select.filter(data => !data.hasOwnProperty("aggregation"));
@@ -87,8 +86,10 @@ function executeQuery(connection, rawQuery, cb) {
   //CBT:sort by
   if(rawQuery.hasOwnProperty("sortby")){
     rawQuery.sortby.map(sortdata=>{
-      let sortOrder = sortdata.order ? sortdata.order.toString().toLowerCase() : 'asc';
-      let sortField = sortdata.field;
+      const sortOrder = sortdata.order ? sortdata.order.toString().toLowerCase() : 'asc';
+      const sortField = sortdata.field;
+      const encloseField=sortdata.encloseField;
+      checkEncloseField(encloseField);
       result=result.sort((a,b)=>{
           if(sortOrder=='asc' && a[sortField]>b[sortField])
             return 1;
@@ -103,7 +104,6 @@ function executeQuery(connection, rawQuery, cb) {
       })
     })
   }
-
   cb({
     status: true,
     content: result
@@ -444,7 +444,9 @@ function createSingleCondition(filter, rawData,tableAlias) {
     table = filter.table ? (filter.table+".") : "",
     aggregation = filter.aggregation ? filter.aggregation : null,
     operator = filter.operator,
-    value = filter.value;
+    value = filter.value,
+    encloseField=filter.encloseField;
+  checkEncloseField(encloseField);
   let filteredData = [];
   let conditiontext = "";
   if (aggregation != null) {
@@ -537,6 +539,11 @@ function executeQueryStream(connection, query, onResultFunction, cb) {
     status: false,
     error:"Need to be implement"
   });
+}
+function checkEncloseField(encloseField){
+  if(encloseField!=null){
+    throw new Error("encloseField is not supported now");
+  }
 }
 
 module.exports = {
