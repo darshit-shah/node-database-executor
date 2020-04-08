@@ -83,7 +83,6 @@ function executeQuery(requestData, cb) {
   const dbConfig = requestData.dbConfig;
   const queryConfig = requestData.query;
   const shouldCache = requestData.hasOwnProperty('shouldCache') ? requestData.shouldCache : false;
-
   prepareQuery(dbConfig, queryConfig, function(data) {
     //     debug('prepareQuery', data);
     if (data.status == true) {
@@ -166,10 +165,12 @@ function executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb) {
         cb(result);
       } else {
         const connection = result.content;
-        if (rawQuery.length <= 100000000) {
-          debug('query: %s', rawQuery);
-        } else {
-          debug('query: %s', rawQuery.substring(0, 500) + '\n...\n' + rawQuery.substring(rawQuery.length - 500, rawQuery.length));
+        if(dbConfig.databaseType!=null && dbConfig.databaseType.toString().toLowerCase()!='json'){
+          if (rawQuery.length <= 100000000) {
+            debug('query: %s', rawQuery);
+          } else {
+            debug('query: %s', rawQuery.substring(0, 500) + '\n...\n' + rawQuery.substring(rawQuery.length - 500, rawQuery.length));
+          }
         }
         const queryStartTime = new Date();
         const objExecutor = databaseExecutor.identify(dbConfig);
