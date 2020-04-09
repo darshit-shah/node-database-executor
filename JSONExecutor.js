@@ -64,15 +64,25 @@ function executeQuery(connection, rawQuery, cb) {
     if (rawQuery.select.length == 0) {
       result = rawQuery.table;
     } else {
-      //CBT:if query don't have any group by
-      if (rawQuery.groupby==null  || (rawQuery.groupby!=null && Array.isArray(rawQuery.groupby)==true && rawQuery.groupby.length==0)) {
-        const aggregatedData = getAggregationData(rawQuery.table, rawQuery.select);
-        //CBT:select all fields from select which doesn't have aggregation key
-        const fieldWithoutAggregation = rawQuery.select.filter(data => !data.hasOwnProperty("aggregation"));
-        result = getDataByFieldName(rawQuery.table, fieldWithoutAggregation, aggregatedData,tableAlias);
-      } else {
-        result = getGroupByData(rawQuery.table, rawQuery.select, rawQuery.groupby,tableAlias);
+      const fieldWithAggregation = rawQuery.select.filter(data => data.hasOwnProperty("aggregation"));
+      const fieldWithoutAggregation = rawQuery.select.filter(data => !data.hasOwnProperty("aggregation"));
+      if(fieldWithAggregation.length>0){
+        //CBT:if query don't have any group by
+        if (rawQuery.groupby==null  || (rawQuery.groupby!=null && Array.isArray(rawQuery.groupby)==true && rawQuery.groupby.length==0)) {
+          // const aggregatedData = getAggregationData(rawQuery.table, rawQuery.select);
+          // //CBT:select all fields from select which doesn't have aggregation key
+          // const fieldWithoutAggregation = rawQuery.select.filter(data => !data.hasOwnProperty("aggregation"));
+          // result = getDataByFieldName(rawQuery.table, fieldWithoutAggregation, aggregatedData,tableAlias);
+
+          
+          result = [processAggregation(null, rawQuery.table, fieldWithoutAggregation, fieldWithAggregation)];
+        } else {
+          result = getGroupByData(rawQuery.table, rawQuery.select, rawQuery.groupby,tableAlias);
+        }
+      }else{
+        result=processSelect(rawQuery.table, fieldWithoutAggregation)
       }
+     
     }
   }
 
@@ -138,155 +148,249 @@ function prepareDatafromJoin(rawQueryJoin,rawQuerySelect){
   return {resultData:resultData,tableAlias:tableAlias};
 }
 
-
-function getGroupByData(rawData, select, groupby,tableAlias) {
-  let result = [];
-  const fieldWithoutAggregation = select.filter(data => !data.hasOwnProperty("aggregation"));
-  if (Array.isArray(groupby)) {
-    //CBT:if group by is an array
-    result = d3
-      .nest()
-      .key(keyData => {
-        return groupby
-          .map(data => {
-            return keyData[data.field];
-          })
-          .join("#$%%$#");
-      })
-      .rollup(dataByGroup => {
-        const aggregatedData = getAggregationData(dataByGroup, select);
-        return getDataByFieldName([dataByGroup[0]], fieldWithoutAggregation, aggregatedData,[]);
-      })
-      .entries(rawData);
-
-    result = result.map(data => {
-      return data.value[0];
+function processSelect(rawData,fieldWithoutAggregation){
+  const result=[];
+  for(let i=0;i<rawData.length;i++){
+    const selectObj = {};
+    fieldWithoutAggregation.forEach(select=>{
+      selectObj[select.alias || select.field] = rawData[i][select.field];
     });
-  } else {
-    //CBT:if group by single field
-    result = d3
-      .nest()
-      .key(keyData => {
-        return keyData[groupby.field];
-      })
-      .rollup(dataByGroup => {
-        const aggregatedData = getAggregationData(dataByGroup, select);
-        return getDataByFieldName([dataByGroup[0]], fieldWithoutAggregation, aggregatedData,[]);
-      })
-      .entries(rawData);
 
-    result = result.map(data => {
-      return data.value[0];
-    });
+    result.push(selectObj);
   }
   return result;
 }
 
-function getAggregationData(dataByGroup, select) {
-  const aggregationToD3ArrayMaiing = {
-    avg: { alias: "mean" }
-  };
-  const aggregationToD3Maiing = {
-    distinct: { alias: "set", cbFunction: "values" }
-  };
-  //CBT:get all fiels from select which have aggregation key
-  const aggregationFields = select.filter(data => data.hasOwnProperty("aggregation"));
-  let aggregatedDataForAllFields = {};
-  aggregationFields.forEach(aggregationFieldData => {
-    function performaAggregation(dataByGroup, aggregation, fieldKey) {
-      const aggregatedData = {};
-      //CBT:if aggregation contains string
-      if (aggregation == "count") {
-        aggregatedData[aggregationFieldData.alias || aggregation + "(" + fieldKey + ")"] = dataByGroup.map(data => {
-          return aggregationFieldData.table!=null ?  data[aggregationFieldData.table+"."+fieldKey] : data[fieldKey];
-        }).length;
-      } else if (d3Array[aggregation]) {
-        //CBT:if aggregation available in d3-array
-        aggregatedData[aggregationFieldData.alias || aggregation + "(" + fieldKey + ")"] = d3Array[aggregation](dataByGroup, data => {
-          return Math.abs(aggregationFieldData.table!=null ? data[aggregationFieldData.table+"."+fieldKey] :data[fieldKey]);
-        });
-      } else if (aggregationToD3ArrayMaiing[aggregation]) {
-        //CBT:if aggregation available in aggregation to d3-array mapping
-        aggregatedData[aggregationFieldData.alias || aggregation + "(" + fieldKey + ")"] = d3Array[aggregationToD3ArrayMaiing[aggregation].alias](dataByGroup, data => {
-          return Math.abs(aggregationFieldData.table!=null ? data[aggregationFieldData.table+"."+fieldKey] :data[fieldKey]);
-        });
-      } else if (aggregationToD3Maiing[aggregation]) {
-        //CBT:if aggregation available in aggregation to d3 mapping
-        aggregatedData[aggregationFieldData.alias || aggregation + "(" + fieldKey + ")"] = d3[aggregationToD3Maiing[aggregation].alias](dataByGroup, data => {
-          return aggregationFieldData.table!=null ? data[aggregationFieldData.table+"."+fieldKey] :data[fieldKey];
-        });
-        if (aggregationToD3Maiing[aggregation].cbFunction) {
-          aggregatedData[aggregationFieldData.alias || aggregation + "(" + fieldKey + ")"] = aggregatedData[aggregationFieldData.alias || aggregation + "(" + fieldKey + ")"][aggregationToD3Maiing[aggregation].cbFunction]();
+function processAggregation(arrIndex, rawData, fieldWithoutAggregation, fieldWithAggregation){
+  const aggrObj = {};
+  fieldWithoutAggregation.forEach(select=>{
+    aggrObj[select.alias || select.field] = rawData[((arrIndex && arrIndex[0]) || 0)][select.field];
+  })
+  fieldWithAggregation.forEach(aggr=>{
+    let output=null;
+    if(aggr.aggregation.toLowerCase() === 'count'){
+      output = (arrIndex && arrIndex.length) || rawData.length;
+    } else if(aggr.aggregation.toLowerCase() === 'sum') {
+      output = 0;
+      for(let i=0;i<((arrIndex && arrIndex.length) || rawData.length);i++){
+        if(rawData[((arrIndex && arrIndex[i]) || i)][aggr.field] != null){
+          output += +rawData[((arrIndex && arrIndex[i]) || i)][aggr.field];
         }
       }
-      return aggregatedData;
     }
-
-    let aggregation = null;
-    if (Array.isArray(aggregationFieldData.aggregation)) {
-      let aggregationArray = [...aggregationFieldData.aggregation];
-      //CBT: Step 1 start
-      aggregation = aggregationArray[aggregationArray.length - 1];
-      let aggregatedDataResult = performaAggregation(dataByGroup, aggregation, aggregationFieldData.field);
-      //CBT: Step 1 end
-      //CBT:if aggregation contains array then performa aggregation operation from n-2 to 0 elements
-      //Example ['count',distinct'] then 'distinct ' calculated using step 1 now percont only count on output data of distinct value
-      aggregationArray.pop(); //Remove last element ex. distinct
-      let fieldForAggregation = Object.keys(aggregatedDataResult)[0];
-      let dateForAggregation = aggregatedDataResult[fieldForAggregation].map(data => {
-        return { [fieldForAggregation]: data };
-      });
-      aggregationArray.reverse();
-      aggregationArray.forEach(aggregationValue => {
-        aggregatedDataResult = performaAggregation(dateForAggregation, aggregationValue, fieldForAggregation);
-        fieldForAggregation = Object.keys(aggregatedDataResult)[0];
-        if (Array.isArray(aggregatedDataResult[fieldForAggregation])) {
-          dateForAggregation = aggregatedDataResult[fieldForAggregation].map(data => {
-            return { [fieldForAggregation]: data };
-          });
-        } else {
-          dateForAggregation = [{ [fieldForAggregation]: aggregatedDataResult[fieldForAggregation] }];
+    else if(aggr.aggregation.toLowerCase() === 'min') {
+      output = +Infinity;
+      for(let i=0;i<((arrIndex && arrIndex.length) || rawData.length);i++){
+        if(rawData[((arrIndex && arrIndex[i]) || i)][aggr.field] != null){
+          if(output> +rawData[((arrIndex && arrIndex[i]) || i)][aggr.field])
+            output = +rawData[((arrIndex && arrIndex[i]) || i)][aggr.field];
         }
-      });
-      aggregatedDataForAllFields = { ...aggregatedDataForAllFields, ...aggregatedDataResult };
+      }
+    }
+    else if(aggr.aggregation.toLowerCase() === 'max') {
+      output = -Infinity;
+      for(let i=0;i<((arrIndex && arrIndex.length) || rawData.length);i++){
+        if(rawData[((arrIndex && arrIndex[i]) || i)][aggr.field] != null){
+          if(output< +rawData[((arrIndex && arrIndex[i]) || i)][aggr.field])
+            output = +rawData[((arrIndex && arrIndex[i]) || i)][aggr.field];
+        }
+      }
+    }
+    else if(aggr.aggregation.toLowerCase() === 'average' || aggr.aggregation.toLowerCase() === 'avg' || aggr.aggregation.toLowerCase() === 'mean'){
+      output = 0;
+      let counter = 0;
+      for(let i=0;i<((arrIndex && arrIndex.length) || rawData.length);i++){
+        if(rawData[((arrIndex && arrIndex[i]) || i)][aggr.field] != null){
+          output += +rawData[((arrIndex && arrIndex[i]) || i)][aggr.field];
+          counter++;
+        }
+      }
+      output /= counter;
     } else {
-      aggregation = aggregationFieldData.aggregation;
-      aggregatedDataForAllFields = { ...aggregatedDataForAllFields, ...performaAggregation(dataByGroup, aggregation, aggregationFieldData.field) };
+      throw Error("Unknown aggregation type");
     }
-  });
-  return aggregatedDataForAllFields;
+    aggrObj[aggr.alias || (aggr.aggregation+"("+aggr.field+")")] = output
+  })
+  return aggrObj;
 }
 
-function getDataByFieldName(dataByGroup, select, aggregatedData,tableAlias) {
-  //CBT:select all fields from select which doesn't have aggregation key
-  let returnData = [];
-  returnData = dataByGroup.map(data => {
-    const dataObj = { ...aggregatedData };
-    select.map(column => {
-      if(column.table==null && tableAlias.length>0){
-        //CBT:check if both table have same number of columns
-        let isSameColumnInTables=false;
-        const sameColumns=[];
-        for(i=0;i<tableAlias.length;i++){
-          let tableColumn=tableAlias[i]+"."+column.field;
-          for(j=i+1;j<tableAlias.length;j++){
-            let columTableName=tableAlias[j]+"."+column.field;
-            if(data.hasOwnProperty(tableColumn)==true &&  data.hasOwnProperty(columTableName)==true){
-              isSameColumnInTables=true;
-              sameColumns.push(column.field);
-            }
-          }
-        }
-       if(isSameColumnInTables==true){
-         throw new Error("Select Data Ambiguous columns:"+sameColumns.join(","));
-       } 
+function getGroupByData(rawData, select, groupby,tableAlias) {
+  let result = [];
+  const fieldWithoutAggregation = select.filter(data => !data.hasOwnProperty("aggregation"));
+  const fieldWithAggregation = select.filter(data => data.hasOwnProperty("aggregation"));
+  if (Array.isArray(groupby) && groupby.length === 1) {
+    groupby = groupby[0];
+  }
+
+  const joiningKey = '#$%%$#';
+  for(let i=0;i<rawData.length;i++){
+    let key = null;
+    if(Array.isArray(groupby)){
+      let key = [];
+      for(let g=0;g<groupby.length;g++){
+        key.push(rawData[i][groupby[g].field])
       }
-      dataObj[column.alias || column.field] = column.table!=null ? data[column.table+"."+column.field] :data[column.field];
-    });
-    return dataObj;
-  });
-  return returnData;
+      key = key.join(joiningKey)
+    } else {
+      key = rawData[i][groupby.field]
+    }
+    if(!result[key]){
+      result[key]=[];
+    }
+    result[key].push(i);
+  }
+
+  result = Object.keys(result).map(key=>{
+    const obj = processAggregation(result[key], rawData, fieldWithoutAggregation, fieldWithAggregation);
+    return obj; 
+  })
+  return result;
+
+  // if(Array.isArray(groupby)) {
+  //   // CBT:if group by is an array
+  //   result = d3
+  //     .nest()
+  //     .key(keyData => {
+  //       return groupby
+  //         .map(data => {
+  //           return keyData[data.field];
+  //         })
+  //         .join("#$%%$#");
+  //     })
+  //     .rollup(dataByGroup => {
+  //       const aggregatedData = getAggregationData(dataByGroup, select);
+  //       return getDataByFieldName([dataByGroup[0]], fieldWithoutAggregation, aggregatedData,[]);
+  //     })
+  //     .entries(rawData);
+
+  //   result = result.map(data => {
+  //     return data.value[0];
+  //   });
+  // } else {
+  //   // CBT:if group by single field
+  //   result = d3
+  //     .nest()
+  //     .key(keyData => {
+  //       return keyData[groupby.field];
+  //     })
+  //     .rollup(dataByGroup => {
+  //       const aggregatedData = getAggregationData(dataByGroup, select);
+  //       return getDataByFieldName([dataByGroup[0]], fieldWithoutAggregation, aggregatedData,[]);
+  //     })
+  //     .entries(rawData);
+
+  //   result = result.map(data => {
+  //     return data.value[0];
+  //   });
+  // }
+  // return result;
 }
+
+// function getAggregationData(dataByGroup, select) {
+//   const aggregationToD3ArrayMaiing = {
+//     avg: { alias: "mean" }
+//   };
+//   const aggregationToD3Maiing = {
+//     distinct: { alias: "set", cbFunction: "values" }
+//   };
+//   //CBT:get all fiels from select which have aggregation key
+//   const aggregationFields = select.filter(data => data.hasOwnProperty("aggregation"));
+//   let aggregatedDataForAllFields = {};
+//   aggregationFields.forEach(aggregationFieldData => {
+//     function performaAggregation(dataByGroup, aggregation, fieldKey) {
+//       const aggregatedData = {};
+//       //CBT:if aggregation contains string
+//       if (aggregation == "count") {
+//         aggregatedData[aggregationFieldData.alias || aggregation + "(" + fieldKey + ")"] = dataByGroup.map(data => {
+//           return aggregationFieldData.table!=null ?  data[aggregationFieldData.table+"."+fieldKey] : data[fieldKey];
+//         }).length;
+//       } else if (d3Array[aggregation]) {
+//         //CBT:if aggregation available in d3-array
+//         aggregatedData[aggregationFieldData.alias || aggregation + "(" + fieldKey + ")"] = d3Array[aggregation](dataByGroup, data => {
+//           return Math.abs(aggregationFieldData.table!=null ? data[aggregationFieldData.table+"."+fieldKey] :data[fieldKey]);
+//         });
+//       } else if (aggregationToD3ArrayMaiing[aggregation]) {
+//         //CBT:if aggregation available in aggregation to d3-array mapping
+//         aggregatedData[aggregationFieldData.alias || aggregation + "(" + fieldKey + ")"] = d3Array[aggregationToD3ArrayMaiing[aggregation].alias](dataByGroup, data => {
+//           return Math.abs(aggregationFieldData.table!=null ? data[aggregationFieldData.table+"."+fieldKey] :data[fieldKey]);
+//         });
+//       } else if (aggregationToD3Maiing[aggregation]) {
+//         //CBT:if aggregation available in aggregation to d3 mapping
+//         aggregatedData[aggregationFieldData.alias || aggregation + "(" + fieldKey + ")"] = d3[aggregationToD3Maiing[aggregation].alias](dataByGroup, data => {
+//           return aggregationFieldData.table!=null ? data[aggregationFieldData.table+"."+fieldKey] :data[fieldKey];
+//         });
+//         if (aggregationToD3Maiing[aggregation].cbFunction) {
+//           aggregatedData[aggregationFieldData.alias || aggregation + "(" + fieldKey + ")"] = aggregatedData[aggregationFieldData.alias || aggregation + "(" + fieldKey + ")"][aggregationToD3Maiing[aggregation].cbFunction]();
+//         }
+//       }
+//       return aggregatedData;
+//     }
+
+//     let aggregation = null;
+//     if (Array.isArray(aggregationFieldData.aggregation)) {
+//       let aggregationArray = [...aggregationFieldData.aggregation];
+//       //CBT: Step 1 start
+//       aggregation = aggregationArray[aggregationArray.length - 1];
+//       let aggregatedDataResult = performaAggregation(dataByGroup, aggregation, aggregationFieldData.field);
+//       //CBT: Step 1 end
+//       //CBT:if aggregation contains array then performa aggregation operation from n-2 to 0 elements
+//       //Example ['count',distinct'] then 'distinct ' calculated using step 1 now percont only count on output data of distinct value
+//       aggregationArray.pop(); //Remove last element ex. distinct
+//       let fieldForAggregation = Object.keys(aggregatedDataResult)[0];
+//       let dateForAggregation = aggregatedDataResult[fieldForAggregation].map(data => {
+//         return { [fieldForAggregation]: data };
+//       });
+//       aggregationArray.reverse();
+//       aggregationArray.forEach(aggregationValue => {
+//         aggregatedDataResult = performaAggregation(dateForAggregation, aggregationValue, fieldForAggregation);
+//         fieldForAggregation = Object.keys(aggregatedDataResult)[0];
+//         if (Array.isArray(aggregatedDataResult[fieldForAggregation])) {
+//           dateForAggregation = aggregatedDataResult[fieldForAggregation].map(data => {
+//             return { [fieldForAggregation]: data };
+//           });
+//         } else {
+//           dateForAggregation = [{ [fieldForAggregation]: aggregatedDataResult[fieldForAggregation] }];
+//         }
+//       });
+//       aggregatedDataForAllFields = { ...aggregatedDataForAllFields, ...aggregatedDataResult };
+//     } else {
+//       aggregation = aggregationFieldData.aggregation;
+//       aggregatedDataForAllFields = { ...aggregatedDataForAllFields, ...performaAggregation(dataByGroup, aggregation, aggregationFieldData.field) };
+//     }
+//   });
+//   return aggregatedDataForAllFields;
+// }
+
+// function getDataByFieldName(dataByGroup, select, aggregatedData,tableAlias) {
+//   //CBT:select all fields from select which doesn't have aggregation key
+//   let returnData = [];
+//   returnData = dataByGroup.map(data => {
+//     const dataObj = { ...aggregatedData };
+//     select.map(column => {
+//       if(column.table==null && tableAlias.length>0){
+//         //CBT:check if both table have same number of columns
+//         let isSameColumnInTables=false;
+//         const sameColumns=[];
+//         for(i=0;i<tableAlias.length;i++){
+//           let tableColumn=tableAlias[i]+"."+column.field;
+//           for(j=i+1;j<tableAlias.length;j++){
+//             let columTableName=tableAlias[j]+"."+column.field;
+//             if(data.hasOwnProperty(tableColumn)==true &&  data.hasOwnProperty(columTableName)==true){
+//               isSameColumnInTables=true;
+//               sameColumns.push(column.field);
+//             }
+//           }
+//         }
+//        if(isSameColumnInTables==true){
+//          throw new Error("Select Data Ambiguous columns:"+sameColumns.join(","));
+//        } 
+//       }
+//       dataObj[column.alias || column.field] = column.table!=null ? data[column.table+"."+column.field] :data[column.field];
+//     });
+//     return dataObj;
+//   });
+//   return returnData;
+// }
 
 function processJoinCondition(tableData,typeOfJoin,joincondition){
   const leftMostTableDataObj={};
