@@ -3,10 +3,10 @@ const d3 = require("d3");
 const d3Array = require("d3-array");
 const operatorrToFunation = {
   "==": (a, b) => {
-    return a == b;
+    return (typeof(a)=='string' ? a.toLowerCase() : a) == (typeof(b)=='string' ? b.toLowerCase() : b);
   },
   "!=": (a, b) => {
-    return a != b;
+    return (typeof(a)=='string' ? a.toLowerCase() : a) != (typeof(b)=='string' ? b.toLowerCase() : b);
   },
   ">": (a, b) => {
     return a > b;
@@ -21,10 +21,10 @@ const operatorrToFunation = {
     return a <= b;
   },
   indexOf: ( value,data) => {
-    return data.indexOf(value) != -1;
+    return data.map(d=>(typeof(d)=='string' ? d.toLowerCase() : d)).indexOf((typeof(value)=='string' ? value.toLowerCase() : value)) != -1;
   },
   "!indexOf": (value,data) => {
-    return data.indexOf(value) == -1;
+    return data.map(d=>(typeof(d)=='string' ? d.toLowerCase() : d)).indexOf((typeof(value)=='string' ? value.toLowerCase() : value)) == -1;
   }
 };
 
