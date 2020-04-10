@@ -3,10 +3,10 @@ const d3 = require("d3");
 const d3Array = require("d3-array");
 const operatorrToFunation = {
   "==": (a, b) => {
-    return a == b;
+    return (typeof(a)=='string' ? a.toLowerCase() : a) == (typeof(b)=='string' ? b.toLowerCase() : b);
   },
   "!=": (a, b) => {
-    return a != b;
+    return (typeof(a)=='string' ? a.toLowerCase() : a) != (typeof(b)=='string' ? b.toLowerCase() : b);
   },
   ">": (a, b) => {
     return a > b;
@@ -21,10 +21,10 @@ const operatorrToFunation = {
     return a <= b;
   },
   indexOf: ( value,data) => {
-    return data.indexOf(value) != -1;
+    return data.map(d=>(typeof(d)=='string' ? d.toLowerCase() : d)).indexOf((typeof(value)=='string' ? value.toLowerCase() : value)) != -1;
   },
   "!indexOf": (value,data) => {
-    return data.indexOf(value) == -1;
+    return data.map(d=>(typeof(d)=='string' ? d.toLowerCase() : d)).indexOf((typeof(value)=='string' ? value.toLowerCase() : value)) == -1;
   }
 };
 
@@ -593,17 +593,6 @@ function createSingleCondition(filter, rawData,tableAlias) {
 
   if (operator != undefined) {
     let sign = operatorSign(operator, value);
-    if(typeof(rawData[conditiontext])=='string')
-       rawData[conditiontext]=rawData[conditiontext].toLowerCase();
-    if(typeof(value)=='string')
-      value=value.toLowerCase();
-    if(Array.isArray(value)==true){
-      for(let i=0;i<value.length;i++){
-        if(typeof(value[i])=='string'){
-          value[i]=value[i].toLowerCase();
-        }
-      }
-    }
     filteredData = operatorrToFunation[sign](rawData[conditiontext],value);
   }
   return filteredData;
