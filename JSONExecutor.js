@@ -179,20 +179,44 @@ function processAggregation(arrIndex, rawData, fieldWithoutAggregation, fieldWit
       }
     }
     else if(aggr.aggregation.toLowerCase() === 'min') {
-      output = +Infinity;
-      for(let i=0;i<((arrIndex && arrIndex.length) || rawData.length);i++){
-        if(rawData[((arrIndex && arrIndex[i]) || i)][aggr.field] != null){
-          if(output> +rawData[((arrIndex && arrIndex[i]) || i)][aggr.field])
-            output = +rawData[((arrIndex && arrIndex[i]) || i)][aggr.field];
+      const rawDataCopy=arrIndex!=null ? [...arrIndex] : [...rawData]; 
+      const isDateDataType=rawDataCopy.some(datad=> Object.prototype.toString.call(datad[aggr.field]) === "[object Date]");
+      if(isDateDataType==true){
+        output = new Date('9999-12-31 23:59:59');
+        for(let i=0;i<((arrIndex && arrIndex.length) || rawData.length);i++){
+          if(rawData[((arrIndex && arrIndex[i]) || i)][aggr.field] != null){
+            if(output.getTime()> (rawData[((arrIndex && arrIndex[i]) || i)][aggr.field]).getTime())
+              output = rawData[((arrIndex && arrIndex[i]) || i)][aggr.field];
+          }
+        }
+      }else{
+        output = +Infinity;
+        for(let i=0;i<((arrIndex && arrIndex.length) || rawData.length);i++){
+          if(rawData[((arrIndex && arrIndex[i]) || i)][aggr.field] != null){
+            if(output> +rawData[((arrIndex && arrIndex[i]) || i)][aggr.field])
+              output = +rawData[((arrIndex && arrIndex[i]) || i)][aggr.field];
+          }
         }
       }
     }
     else if(aggr.aggregation.toLowerCase() === 'max') {
-      output = -Infinity;
-      for(let i=0;i<((arrIndex && arrIndex.length) || rawData.length);i++){
-        if(rawData[((arrIndex && arrIndex[i]) || i)][aggr.field] != null){
-          if(output< +rawData[((arrIndex && arrIndex[i]) || i)][aggr.field])
-            output = +rawData[((arrIndex && arrIndex[i]) || i)][aggr.field];
+      const rawDataCopy=arrIndex!=null ? [...arrIndex] : [...rawData]; 
+      const isDateDataType=rawDataCopy.some(datad=> Object.prototype.toString.call(datad[aggr.field]) === "[object Date]");
+      if(isDateDataType==true){
+        output = new Date('1970-01-01 00:00:00');
+        for(let i=0;i<((arrIndex && arrIndex.length) || rawData.length);i++){
+          if(rawData[((arrIndex && arrIndex[i]) || i)][aggr.field] != null){
+            if(output.getTime()< (rawData[((arrIndex && arrIndex[i]) || i)][aggr.field]).getTime())
+              output = rawData[((arrIndex && arrIndex[i]) || i)][aggr.field];
+          }
+        }
+      }else{
+        output = -Infinity;
+        for(let i=0;i<((arrIndex && arrIndex.length) || rawData.length);i++){
+          if(rawData[((arrIndex && arrIndex[i]) || i)][aggr.field] != null){
+            if(output< +rawData[((arrIndex && arrIndex[i]) || i)][aggr.field])
+              output = +rawData[((arrIndex && arrIndex[i]) || i)][aggr.field];
+          }
         }
       }
     }
