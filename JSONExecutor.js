@@ -593,6 +593,17 @@ function createSingleCondition(filter, rawData,tableAlias) {
 
   if (operator != undefined) {
     let sign = operatorSign(operator, value);
+    if(typeof(rawData[conditiontext])=='string')
+       rawData[conditiontext]=rawData[conditiontext].toLowerCase();
+    if(typeof(value)=='string')
+      value=value.toLowerCase();
+    if(Array.isArray(value)==true){
+      for(let i=0;i<value.length;i++){
+        if(typeof(value[i])=='string'){
+          value[i]=value[i].toLowerCase();
+        }
+      }
+    }
     filteredData = operatorrToFunation[sign](rawData[conditiontext],value);
   }
   return filteredData;
