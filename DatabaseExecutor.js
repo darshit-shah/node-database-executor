@@ -70,7 +70,7 @@ function executeRawQueryPromise(requestData) {
   return new Promise((resolve, reject) => {
     executeRawQuery(requestData, output => {
       if (!output.status) {
-        reject(output);
+        reject(output.error);
       } else {
         resolve(output.content);
       }
@@ -97,7 +97,7 @@ function executeQueryPromise(requestData) {
   return new Promise((resolve, reject) => {
     executeQuery(requestData, output => {
       if (!output.status) {
-        reject(output);
+        reject(output.error);
       } else {
         resolve(output.content);
       }
