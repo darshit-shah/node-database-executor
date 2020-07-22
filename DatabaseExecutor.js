@@ -2,6 +2,8 @@ const debug = require('debug')('database-executor:database-executor');
 const databaseConnector = require('node-database-connectors');
 const databaseExecutor = require('./ConnectorIdentifier.js');
 const axiomUtils = require('axiom-utils');
+const http = require('http');
+
 if (global._connectionPools == null) {
   global._connectionPools = {};
 }
@@ -413,17 +415,64 @@ function executeRawQueriesWithConnectionPromise(requestData) {
   })
 };
 
+function executeFluxQuery(requestData, cb) {
+  const dbConfig = requestData.dbConfig;
+  const query = requestData.query;
+  const options = {
+    hostname: dbConfig.host,
+    port: dbConfig.port,
+    path: '/api/v2/query',
+    method: 'POST',
+    headers: {
+      'Accept': 'application/csv',
+      'Content-Type': 'application/vnd.flux',
+      'Content-Length': Buffer.byteLength(query)
+    }
+  }
+  http.request(options, res => {
+      let data = ""
+      res.on("data", d => {
+        data += d
+      })
+      res.on("end", () => {
+        cb({
+          status: true,
+          content: data
+        })
+      })
+    }).on("error", (err) => {
+      cb({
+        status: false,
+        error: err
+      })
+    }).end(query);
+}
+
+function executeFluxQueryPromise(requestData) {
+  return new Promise((resolve, reject) => {
+    executeFluxQuery(requestData, output => {
+      if (!output.status) {
+        reject(output.error);
+      } else {
+        resolve(output.content);
+      }
+    });
+  });
+}
+
 module.exports = {
   executeRawQuery: executeRawQuery,
   executeQuery: executeQuery,
   flushCache: flushCache,
   executeQueryStream: executeQueryStream,
   executeRawQueriesWithConnection: executeRawQueriesWithConnection,
+  executeFluxQuery: executeFluxQuery,
   promise: {
     executeRawQuery: executeRawQueryPromise,
     executeQuery:executeQueryPromise,
     flushCache:flushCache,
     executeQueryStream:executeQueryStreamPromise,
-    executeRawQueriesWithConnection:executeRawQueriesWithConnectionPromise
+    executeRawQueriesWithConnection:executeRawQueriesWithConnectionPromise,
+    executeFluxQuery: executeFluxQueryPromise
   }
 };

@@ -19,8 +19,10 @@ function identifyConnection(json) {
       objConnection = require('./ClickhouseExecutor.js');
     } else if (json.databaseType == "redshift") {
       objConnection = require('./RedShiftExecutor.js');
-    }else if (json.databaseType == "json") {
+    } else if (json.databaseType == "json") {
       objConnection = require('./JSONExecutor.js');
+    } else if (json.databaseType === "influx") {
+      objConnection = require('./InfluxExecutor.js');
     }
     /*else if (json.databaseType == "mssql") {
         objConnection = require('./MSSQLConnector.js');
