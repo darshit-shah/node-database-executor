@@ -9,6 +9,13 @@ function executeQuery(connection, rawQuery,cb) {
   }
   connection.execute(rawQuery, undefined, {consistency: driver.types.consistencies.quorum}, function(err, results) {
     if (err) {
+      if(err.message.startsWith("PRIMARY KEY column ") && err.message.indexOf("cannot be restricted as preceding column")>-1 && err.message.endsWith(" is not restricted") && rawQuery.toLowerCase().indexOf("allow filtering")===-1) {
+        if(rawQuery.trim().endsWith(";")){
+          rawQuery = rawQuery.trim();
+          rawQuery = rawQuery.substring(0,rawQuery.length-1);
+        }
+        return executeQuery(connection, rawQuery+" allow filtering;",cb);
+      }
       debug("query", err);
       var e = err;
       cb({
