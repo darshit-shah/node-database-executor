@@ -15,6 +15,12 @@ function executeQuery(connection, rawQuery,cb) {
           rawQuery = rawQuery.substring(0,rawQuery.length-1);
         }
         return executeQuery(connection, rawQuery+" allow filtering;",cb);
+      } else if(err.message.startsWith('Cannot execute this query') && err.message.endsWith('use ALLOW FILTERING') && err.message.indexOf('might involve data filtering') > -1 && err.message.indexOf('may have unpredictable performance') > -1) {
+        if(rawQuery.trim().endsWith(";")) {
+          rawQuery = rawQuery.trim();
+          rawQuery = rawQuery.substring(0,rawQuery.length-1);
+        }
+        return executeQuery(connection, `${rawQuery} allow filtering;`,cb);
       }
       debug("query", err);
       var e = err;
