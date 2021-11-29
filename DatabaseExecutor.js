@@ -43,6 +43,9 @@ function executeRawQueryWithConnection(dbConfig, rawQuery, cb) {
       } else {
         const objExecutor = databaseExecutor.identify(dbConfig);
         objExecutor.executeQuery(connection, rawQuery, function(result) {
+          if (result.status == false) {
+            console.log('DB Executor Error', dbConfig, rawQuery);
+          }
           objConnection.disconnect(connection);
           cb(result);
         });
@@ -50,6 +53,7 @@ function executeRawQueryWithConnection(dbConfig, rawQuery, cb) {
     });
   } catch (ex) {
     console.log('exception: ', ex);
+    console.log('Error in Query: ', rawQuery);
     const e = ex;
     //e.exception=ex;
     cb({
@@ -187,6 +191,7 @@ function executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb) {
     });
   } catch (ex) {
     console.log('exception: ', ex);
+    console.log('Error in Query: ', rawQuery);
     const e = ex;
     //e.exception=ex;
     cb({
