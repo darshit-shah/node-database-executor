@@ -38,8 +38,8 @@ function executeQuery(connection, rawQuery, cb) {
       cb({
         status: true,
         content: results.rows.map(d => {
-          return (!Array.isArray(d) ? axiom_utils.convertObjectKeysCaseInsensitive(d) : d.map(innerD => {
-            return axiom_utils.convertObjectKeysCaseInsensitive(innerD);
+          return (!Array.isArray(d) ? __convertToCaseInsensitiveAndNumberIfPossible(d) : d.map(innerD => {
+            return __convertToCaseInsensitiveAndNumberIfPossible(innerD);
           }));
         })
       });
@@ -66,7 +66,7 @@ function executeQueryStream(connection, query, onResultFunction, cb) {
       // Pausing the connnection is useful if your processing involves I/O
       connection.pause();
 
-      onResultFunction(axiom_utils.convertObjectKeysCaseInsensitive(row), function() {
+      onResultFunction(__convertToCaseInsensitiveAndNumberIfPossible(row), function() {
         connection.resume();
       });
     })
@@ -76,6 +76,11 @@ function executeQueryStream(connection, query, onResultFunction, cb) {
       });
 
     });
+}
+
+function __convertToCaseInsensitiveAndNumberIfPossible(row){
+  Object.keys(row).forEach((column)=>{ row[column] = axiom_utils.convertToNumericIfPossible(row[column]); });
+  return __convertToCaseInsensitiveAndNumberIfPossible(row);
 }
 
 module.exports = {
