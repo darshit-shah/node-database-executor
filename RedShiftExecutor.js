@@ -80,7 +80,7 @@ function executeQueryStream(connection, query, onResultFunction, cb) {
 
 function __convertToCaseInsensitiveAndNumberIfPossible(row){
   Object.keys(row).forEach((column)=>{ row[column] = axiom_utils.convertToNumericIfPossible(row[column]); });
-  return __convertToCaseInsensitiveAndNumberIfPossible(row);
+  return axiom_utils.convertObjectKeysCaseInsensitive(row);
 }
 
 module.exports = {
