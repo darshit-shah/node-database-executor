@@ -25,26 +25,60 @@ function executeQuery(connection, rawQuery, cb) {
     debug('query: %s', rawQuery.substring(0, 500) + "\n...\n" + rawQuery.substring(rawQuery.length - 500, rawQuery.length));
   }
 
-
-  connection.query(rawQuery, function(err, results) {
-    if (err) {
-      debug("query", err);
-      var e = err;
-      cb({
-        status: false,
-        error: e
-      });
-    } else {
-      cb({
-        status: true,
-        content: results.rows.map(d => {
-          return (!Array.isArray(d) ? __convertToCaseInsensitiveAndNumberIfPossible(d) : d.map(innerD => {
-            return __convertToCaseInsensitiveAndNumberIfPossible(innerD);
-          }));
-        })
-      });
-    }
-  });
+  // In Redshift driver if you are using pool you need to first call connectmenthod to get
+  // connection from pool and then ececute the query
+  if(connection.options && connection.options.hasOwnProperty("max")){
+    connection.connect((err, client, release) => {
+      if(err) {
+        debug("query", err);
+        cb({
+          status: false,
+          error: err
+        });
+      } else {
+        client.query(rawQuery, function(err, results) {
+          release(); 
+          if (err) {
+            debug("query", err);
+            var e = err;
+            cb({
+              status: false,
+              error: e
+            });
+          } else {
+            cb({
+              status: true,
+              content: results.rows.map(d => {
+                return (!Array.isArray(d) ? __convertToCaseInsensitiveAndNumberIfPossible(d) : d.map(innerD => {
+                  return __convertToCaseInsensitiveAndNumberIfPossible(innerD);
+                }));
+              })
+            });
+          }
+        });
+      }
+    });
+  } else {
+    connection.query(rawQuery, function(err, results) {
+      if (err) {
+        debug("query", err);
+        var e = err;
+        cb({
+          status: false,
+          error: e
+        });
+      } else {
+        cb({
+          status: true,
+          content: results.rows.map(d => {
+            return (!Array.isArray(d) ? __convertToCaseInsensitiveAndNumberIfPossible(d) : d.map(innerD => {
+              return __convertToCaseInsensitiveAndNumberIfPossible(innerD);
+            }));
+          })
+        });
+      }
+    });
+  }
 }
 
 function executeQueryStream(connection, query, onResultFunction, cb) {
