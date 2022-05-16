@@ -12,7 +12,7 @@ const oldResults = {};
 function prepareQuery(dbConfig, queryConfig, cb) {
   try {
     const objConnection = databaseConnector.identify(dbConfig);
-    const query = objConnection.prepareQuery(queryConfig);
+    const query = objConnection.prepareQuery(queryConfig, dbConfig);
     cb({
       status: true,
       content: query
