@@ -1,10 +1,14 @@
 var debug = require('debug')('database-executor:redshift-executor');
 var axiom_utils = require("axiom-utils");
-
 function updateQueryAsPerRedShiftSyntax(query) {
 
-  query = query.replace(/`\.`/g, "");
+  //query = query.replace(/`\.`/g, "");
+  //query = query.replace(/`/g, '"');
+
+  query = query.replace(/`\.`/g, '"."');
   query = query.replace(/`/g, '"');
+  query = query.replace(/""\./g, "");
+
 
   var limitMatch = query.toLowerCase().match(new RegExp(/limit [0-9]+,[0-9]+[;]*/ig));
   if (limitMatch && limitMatch.length) {
@@ -24,20 +28,19 @@ function executeQuery(connection, rawQuery, cb) {
   } else {
     debug('query: %s', rawQuery.substring(0, 500) + "\n...\n" + rawQuery.substring(rawQuery.length - 500, rawQuery.length));
   }
-
-  // In Redshift driver if you are using pool you need to first call connectmenthod to get
-  // connection from pool and then ececute the query
-  if(connection.options && connection.options.hasOwnProperty("max")){
+  // In Redshift driver if you are using pool you need to first call connectmenthod to get  
+  // connection from pool and then ececute the query  
+  if (connection.options && connection.options.hasOwnProperty("max")) {
     connection.connect((err, client, release) => {
-      if(err) {
+      if (err) {
         debug("query", err);
         cb({
           status: false,
           error: err
         });
       } else {
-        client.query(rawQuery, function(err, results) {
-          release(); 
+        client.query(rawQuery, function (err, results) {
+          release();
           if (err) {
             debug("query", err);
             var e = err;
@@ -48,18 +51,18 @@ function executeQuery(connection, rawQuery, cb) {
           } else {
             cb({
               status: true,
-              content: results.rows.map(d => {
+              content: results && results.rows ? results.rows.map(d => {
                 return (!Array.isArray(d) ? __convertToCaseInsensitiveAndNumberIfPossible(d) : d.map(innerD => {
                   return __convertToCaseInsensitiveAndNumberIfPossible(innerD);
                 }));
-              })
+              }) : []
             });
           }
         });
       }
     });
   } else {
-    connection.query(rawQuery, function(err, results) {
+    connection.query(rawQuery, function (err, results) {
       if (err) {
         debug("query", err);
         var e = err;
@@ -70,11 +73,11 @@ function executeQuery(connection, rawQuery, cb) {
       } else {
         cb({
           status: true,
-          content: results.rows.map(d => {
+          content: results && results.rows ? results.rows.map(d => {
             return (!Array.isArray(d) ? __convertToCaseInsensitiveAndNumberIfPossible(d) : d.map(innerD => {
               return __convertToCaseInsensitiveAndNumberIfPossible(innerD);
             }));
-          })
+          }) : []
         });
       }
     });
@@ -83,37 +86,33 @@ function executeQuery(connection, rawQuery, cb) {
 
 function executeQueryStream(connection, query, onResultFunction, cb) {
   query = updateQueryAsPerRedShiftSyntax(query);
-
   var queryExecutor = connection.query(query);
-  queryExecutor
-    .on('error', function(err) {
-      cb({
-        status: false,
-        error: err
-      });
-      // Handle error, an 'end' event will be emitted after this as well
+  queryExecutor.on('error', function (err) {
+    cb({
+      status: false,
+      error: err
+    });
+    // Handle error, an 'end' event will be emitted after this as well    
+  })
+    .on('fields', function (fields) {
+      // the field packets for the rows to follow    
     })
-    .on('fields', function(fields) {
-      // the field packets for the rows to follow
-    })
-    .on('result', function(row) {
-      // Pausing the connnection is useful if your processing involves I/O
+    .on('result', function (row) {
+      // Pausing the connnection is useful if your processing involves I/O      
       connection.pause();
-
-      onResultFunction(__convertToCaseInsensitiveAndNumberIfPossible(row), function() {
+      onResultFunction(__convertToCaseInsensitiveAndNumberIfPossible(row), function () {
         connection.resume();
       });
     })
-    .on('end', function() {
+    .on('end', function () {
       cb({
         status: true
       });
-
     });
 }
 
-function __convertToCaseInsensitiveAndNumberIfPossible(row){
-  Object.keys(row).forEach((column)=>{ row[column] = axiom_utils.convertToNumericIfPossible(row[column]); });
+function __convertToCaseInsensitiveAndNumberIfPossible(row) {
+  Object.keys(row).forEach((column) => { row[column] = axiom_utils.convertToNumericIfPossible(row[column]); });
   return axiom_utils.convertObjectKeysCaseInsensitive(row);
 }
 
@@ -121,5 +120,3 @@ module.exports = {
   executeQuery: executeQuery,
   executeQueryStream: executeQueryStream
 }
-
-
