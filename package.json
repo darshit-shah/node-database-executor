@@ -18,7 +18,8 @@
   "dependencies": {
     "node-database-connectors": "*",
     "debug": "*",
-    "axiom-utils": "*"
+    "axiom-utils": "*",
+    "@aws-sdk/client-secrets-manager": "3.350.0"
   },
   "homepage": "https://github.com/darshit-shah/node-database-executor#readme"
 }
