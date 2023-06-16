@@ -1,6 +1,6 @@
 {
   "name": "node-database-executor",
-  "version": "2.4.8",
+  "version": "2.4.9",
   "description": "",
   "main": "DatabaseExecutor.js",
   "scripts": {
@@ -18,7 +18,8 @@
   "dependencies": {
     "node-database-connectors": "*",
     "debug": "*",
-    "axiom-utils": "*"
+    "axiom-utils": "*",
+    "@aws-sdk/client-secrets-manager": "3.350.0"
   },
   "homepage": "https://github.com/darshit-shah/node-database-executor#readme"
 }

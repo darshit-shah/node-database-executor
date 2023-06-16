@@ -3,11 +3,85 @@ const databaseConnector = require('node-database-connectors');
 const databaseExecutor = require('./ConnectorIdentifier.js');
 const axiomUtils = require('axiom-utils');
 const http = require('http');
+const { SecretsManagerClient, ListSecretsCommand, GetSecretValueCommand } = require("@aws-sdk/client-secrets-manager");
+const listSecretsCommand = new ListSecretsCommand({});
+const dbPasswordMapping = {}
 
 if (global._connectionPools == null) {
   global._connectionPools = {};
 }
 const oldResults = {};
+
+function getPasswordFromAwsSecretsManager(secretName, accessKey, secretKey, cb) {
+  const awsSecretsManagerClient = new SecretsManagerClient({
+    credentials: {
+      accessKeyId: accessKey,
+      secretAccessKey: secretKey,
+    },
+  });
+  awsSecretsManagerClient.send(listSecretsCommand, (err, data) => {
+    if (data) {
+      let response = data.SecretList.find(d => d.Name == secretName)
+      const getSecretValueCommand = new GetSecretValueCommand({
+        SecretId: response.Name
+      });
+      awsSecretsManagerClient.send(getSecretValueCommand, (err, data) => {
+        if (data) {
+          let secretValue = data
+          secretValue = secretValue.SecretString;
+          cb(secretValue);
+        }
+      })
+    }
+  });
+}
+
+function isValidJSON(inputString) {
+  try {
+    JSON.parse(inputString);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function getPasswordValue(dbConfig, cb) {
+  let dbConfigCopy = axiomUtils.extend(true, {}, dbConfig)
+  if (typeof (dbConfigCopy.password) === "object" || isValidJSON(dbConfigCopy.password)) {
+    const passwordConfig = typeof (dbConfigCopy.password) === "object" ? dbConfigCopy.password : JSON.parse(dbConfig.password);
+    if (passwordConfig && passwordConfig.passwordType == "keyVault" && process.env.key_Vault && process.env.key_Vault.length > 0) {
+      try {
+        const keyVault = JSON.parse(process.env.key_Vault)
+        let vaultIdentifier = passwordConfig.vaultName;
+        let secretName = passwordConfig.secretName;
+        let type = keyVault[vaultIdentifier] && keyVault[vaultIdentifier].type;
+        const accessKey = keyVault[vaultIdentifier].accessKey;
+        const secretKey = keyVault[vaultIdentifier].secretKey;
+        if (type === "awsKeyVault") {
+          if (dbPasswordMapping[type] && dbPasswordMapping[type][vaultIdentifier] && dbPasswordMapping[type][vaultIdentifier][secretName] && dbPasswordMapping[type][vaultIdentifier][secretName].password) {
+            dbConfigCopy.password = dbPasswordMapping[type][vaultIdentifier][secretName].password
+            cb(dbConfigCopy)
+          } else {
+            getPasswordFromAwsSecretsManager(secretName, accessKey, secretKey, (result) => {
+              if (result) {
+                dbConfigCopy.password = result
+                dbPasswordMapping[type] = { [vaultIdentifier]: { [secretName]: { password: result } } }
+                cb(dbConfigCopy)
+              }
+            });
+          }
+        }
+      }
+      catch (error) {
+        console.error(error)
+      }
+    }
+  } else {
+    cb(dbConfigCopy)
+  }
+}
+
+
 
 function prepareQuery(dbConfig, queryConfig, cb) {
   try {
@@ -31,7 +105,7 @@ function prepareQuery(dbConfig, queryConfig, cb) {
 function executeRawQueryWithConnection(dbConfig, rawQuery, cb) {
   try {
     const objConnection = databaseConnector.identify(dbConfig);
-    objConnection.connect(dbConfig, function(err, connection) {
+    objConnection.connect(dbConfig, function (err, connection) {
       if (err != undefined) {
         console.log('connection error: ', err);
         const e = err;
@@ -42,7 +116,7 @@ function executeRawQueryWithConnection(dbConfig, rawQuery, cb) {
         });
       } else {
         const objExecutor = databaseExecutor.identify(dbConfig);
-        objExecutor.executeQuery(connection, rawQuery, function(result) {
+        objExecutor.executeQuery(connection, rawQuery, function (result) {
           if (result.status == false) {
             console.log('DB Executor Error', dbConfig, rawQuery);
           }
@@ -69,7 +143,13 @@ function executeRawQuery(requestData, cb) {
   const rawQuery = requestData.query;
   const tableName = requestData.table;
   const shouldCache = requestData.hasOwnProperty('shouldCache') ? requestData.shouldCache : false;
-  executeRawQueryInner(dbConfig, rawQuery, shouldCache, tableName, cb);
+  // executeRawQueryInner(dbConfig, rawQuery, shouldCache, tableName, cb);
+
+  getPasswordValue(dbConfig, (updatedDBConfig) => {
+    if (updatedDBConfig) {
+      executeRawQueryInner(updatedDBConfig, rawQuery, shouldCache, tableName, cb);
+    }
+  })
 }
 
 function executeRawQueryPromise(requestData) {
@@ -89,10 +169,14 @@ function executeQuery(requestData, cb) {
   const dbConfig = requestData.dbConfig;
   const queryConfig = requestData.query;
   const shouldCache = requestData.hasOwnProperty('shouldCache') ? requestData.shouldCache : false;
-  prepareQuery(dbConfig, queryConfig, function(data) {
+  prepareQuery(dbConfig, queryConfig, function (data) {
     //     debug('prepareQuery', data);
     if (data.status == true) {
-      executeRawQueryInner(dbConfig, data.content, shouldCache, queryConfig.table, cb);
+      getPasswordValue(dbConfig, (updatedDBConfig) => {
+        if (updatedDBConfig) {
+          executeRawQueryInner(updatedDBConfig, data.content, shouldCache, queryConfig.table, cb);
+        }
+      })
     } else {
       cb(data);
     }
@@ -111,11 +195,11 @@ function executeQueryPromise(requestData) {
   });
 }
 
- function executeQueryStream(requestData, onResultFunction, cb) {
+function executeQueryStream(requestData, onResultFunction, cb) {
   const dbConfig = requestData.dbConfig;
   const query = requestData.rawQuery;
   const objConnection = databaseConnector.identify(dbConfig);
-  objConnection.connect(dbConfig, function(err, connection) {
+  objConnection.connect(dbConfig, function (err, connection) {
     if (err != undefined) {
       console.log('connection error: ', err);
       const e = err;
@@ -132,32 +216,39 @@ function executeQueryPromise(requestData) {
 };
 
 
-function executeQueryStreamPromise(requestData, onResultFunction){
+function executeQueryStreamPromise(requestData, onResultFunction) {
   return new Promise((resolve, reject) => {
     const dbConfig = requestData.dbConfig;
     const query = requestData.rawQuery;
-    const objConnection = databaseConnector.identify(dbConfig);
-    objConnection.connect(dbConfig,(err, connection)=> {
-      if (err != undefined) {
-        console.log('connection error: ', err);
-        // const e = err;
-        //e.exception=ex;
-        // cb({
-        //   status: false,
-        //   error: e
-        // });
-        reject(err);
-      } else {
-        const objExecutor = databaseExecutor.identify(dbConfig);
-        objExecutor.executeQueryStream(connection, query, onResultFunction, output=>{
-          if(!output.status){
-            reject(output);
-          }else{
-            resolve()
+
+    getPasswordValue(dbConfig, (updatedDBConfig) => {
+      if (updatedDBConfig) {
+        const objConnection = databaseConnector.identify(updatedDBConfig);
+        objConnection.connect(updatedDBConfig, (err, connection) => {
+          if (err != undefined) {
+            console.log('connection error: ', err);
+            // const e = err;
+            //e.exception=ex;
+            // cb({
+            //   status: false,
+            //   error: e
+            // });
+            reject(err);
+          } else {
+            const objExecutor = databaseExecutor.identify(updatedDBConfig);
+            objExecutor.executeQueryStream(connection, query, onResultFunction, output => {
+              if (!output.status) {
+                reject(output);
+              } else {
+                resolve()
+              }
+            });
           }
         });
       }
-    });
+    })
+
+
   })
 }
 
@@ -166,12 +257,12 @@ function executeQueryStreamPromise(requestData, onResultFunction){
 function executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb) {
   try {
     const startTime = new Date();
-    getConnectionFromPool(dbConfig, function(result) {
+    getConnectionFromPool(dbConfig, function (result) {
       if (result.status === false) {
         cb(result);
       } else {
         const connection = result.content;
-        if(dbConfig.databaseType!=null && dbConfig.databaseType.toString().toLowerCase()!='json'){
+        if (dbConfig.databaseType != null && dbConfig.databaseType.toString().toLowerCase() != 'json') {
           if (rawQuery.length <= 100000000) {
             debug('query: %s', rawQuery);
           } else {
@@ -180,7 +271,7 @@ function executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb) {
         }
         const queryStartTime = new Date();
         const objExecutor = databaseExecutor.identify(dbConfig);
-        objExecutor.executeQuery(connection, rawQuery, function(result) {
+        objExecutor.executeQuery(connection, rawQuery, function (result) {
           if (result.status == false) {
             console.log('DB Executor Error', dbConfig, rawQuery);
           }
@@ -213,8 +304,8 @@ function executeRawQueryInner(dbConfig, rawQuery, shouldCache, tableName, cb) {
         return !Array.isArray(d)
           ? convertObject(d)
           : d.map(innerD => {
-              return convertObject(innerD);
-            });
+            return convertObject(innerD);
+          });
       });
     } else {
       result = axiomUtils.extend(true, [], result);
@@ -223,7 +314,7 @@ function executeRawQueryInner(dbConfig, rawQuery, shouldCache, tableName, cb) {
   } else {
     if (dbConfig.hasOwnProperty('connectionLimit') && dbConfig.connectionLimit == 0) {
       debug('With New Connection');
-      executeRawQueryWithConnection(dbConfig, rawQuery, function(responseData) {
+      executeRawQueryWithConnection(dbConfig, rawQuery, function (responseData) {
         cb(responseData);
         if (shouldCache == true && responseData.status == true) {
           saveToCache(responseData.content, dbConfig, rawQuery, tableName);
@@ -231,7 +322,7 @@ function executeRawQueryInner(dbConfig, rawQuery, shouldCache, tableName, cb) {
       });
     } else {
       debug('With Connection Pool');
-      executeRawQueryWithConnectionPool(dbConfig, rawQuery, function(responseData) {
+      executeRawQueryWithConnectionPool(dbConfig, rawQuery, function (responseData) {
         cb(responseData);
         if (shouldCache == true && responseData.status == true) {
           saveToCache(responseData.content, dbConfig, rawQuery, tableName);
@@ -252,7 +343,7 @@ function getConnectionFromPool(dbConfig, cb) {
       return;
     } else {
       const objConnection = databaseConnector.identify(dbConfig);
-      objConnection.connectPool(dbConfig, function(err, pool) {
+      objConnection.connectPool(dbConfig, function (err, pool) {
         if (err != undefined) {
           console.log('connection error: ', err);
           const e = err;
@@ -282,8 +373,8 @@ function getConnectionFromPool(dbConfig, cb) {
 }
 
 function saveToCache(finalData, dbConfig, queryString, tableName) {
-  if(dbConfig.databaseType!=null && dbConfig.databaseType.toString().toLowerCase()=='json'){
-    const errorMessage="Caching result is not supported in JSON type database, please set shouldCache to false or remove it";
+  if (dbConfig.databaseType != null && dbConfig.databaseType.toString().toLowerCase() == 'json') {
+    const errorMessage = "Caching result is not supported in JSON type database, please set shouldCache to false or remove it";
     console.error(errorMessage);
     throw new Error(errorMessage);
   }
@@ -320,7 +411,7 @@ function flushCache(dbConfig, tableName) {
 
 function convertObject(row) {
   return new Proxy(row, {
-    get: function(target, name) {
+    get: function (target, name) {
       if (typeof name !== 'string') {
         return undefined;
       }
@@ -329,7 +420,7 @@ function convertObject(row) {
       }
       return target[name.toLowerCase()];
     },
-    set: function(target, name, value) {
+    set: function (target, name, value) {
       if (typeof name !== 'string') {
         return undefined;
       }
@@ -348,7 +439,7 @@ function executeRawQueriesWithSpecificConnection(dbConfig, connection, queries, 
       cb(allErrs, allResults, allFields);
       return;
     }
-    objExecutor.executeQuery(connection, queries[index], function(result) {
+    objExecutor.executeQuery(connection, queries[index], function (result) {
       if (result.status) {
         allErrs.push(null);
         allResults.push(result.content);
@@ -365,25 +456,53 @@ function executeRawQueriesWithSpecificConnection(dbConfig, connection, queries, 
 
 function executeRawQueriesWithConnection(requestData, cb) {
   try {
-    const dbConfig = requestData.dbConfig;
+    const dbConfig = axiomUtils.extend({}, true, requestData.dbConfig);
     const rawQueries = requestData.rawQueries;
     const objConnection = databaseConnector.identify(dbConfig);
-    objConnection.connect(dbConfig, function(err, connection) {
-      if (err != undefined) {
-        console.log('connection error: ', err);
-        const e = err;
-        //e.exception=ex;
-        cb({
-          status: false,
-          error: e
-        });
-      } else {
-        executeRawQueriesWithSpecificConnection(dbConfig, connection, rawQueries, function(allErrs, allResults, allFields) {
-          objConnection.disconnect(connection);
-          cb(allErrs, allResults, allFields);
-        });
-      }
-    });
+    const keyVault = JSON.parse(process.env.key_Vault);
+    const vaultName = dbConfig.password.vaultName;
+    const secretName = dbConfig.password.secretName;
+    const type = keyVault[vaultName] && keyVault[vaultName].type;
+    if (typeof (dbConfig.password) === "object" && secretName && vaultName && dbPasswordMapping[type] && dbPasswordMapping[type][vaultName] && dbPasswordMapping[type][vaultName][secretName] && process.env.key_Vault) {
+      dbConfig.password = dbPasswordMapping[type][vaultName][secretName].password
+      objConnection.connect(dbConfig, function (err, connection) {
+        if (err != undefined) {
+          console.log('connection error: ', err);
+          const e = err;
+          //e.exception=ex;
+          cb({
+            status: false,
+            error: e
+          });
+        } else {
+          executeRawQueriesWithSpecificConnection(dbConfig, connection, rawQueries, function (allErrs, allResults, allFields) {
+            objConnection.disconnect(connection);
+            cb(allErrs, allResults, allFields);
+          });
+        }
+      });
+    } else {
+      getPasswordValue(dbConfig, (updatedDBConfig) => {
+        if (updatedDBConfig) {
+          objConnection.connect(updatedDBConfig, function (err, connection) {
+            if (err != undefined) {
+              console.log('connection error: ', err);
+              const e = err;
+              //e.exception=ex;
+              cb({
+                status: false,
+                error: e
+              });
+            } else {
+              executeRawQueriesWithSpecificConnection(updatedDBConfig, connection, rawQueries, function (allErrs, allResults, allFields) {
+                objConnection.disconnect(connection);
+                cb(allErrs, allResults, allFields);
+              });
+            }
+          });
+        }
+      })
+    }
   } catch (ex) {
     console.log('exception: ', ex);
     const e = ex;
@@ -402,12 +521,12 @@ function executeRawQueriesWithConnectionPromise(requestData) {
       const dbConfig = requestData.dbConfig;
       const rawQueries = requestData.rawQueries;
       const objConnection = databaseConnector.identify(dbConfig);
-      objConnection.connect(dbConfig, function(err, connection) {
+      objConnection.connect(dbConfig, function (err, connection) {
         if (err != undefined) {
           console.log('connection error: ', err);
           reject(err);
         } else {
-          executeRawQueriesWithSpecificConnection(dbConfig, connection, rawQueries, function(allErrs, allResults, allFields) {
+          executeRawQueriesWithSpecificConnection(dbConfig, connection, rawQueries, function (allErrs, allResults, allFields) {
             objConnection.disconnect(connection);
             resolve(allErrs, allResults, allFields);
           });
@@ -423,34 +542,38 @@ function executeRawQueriesWithConnectionPromise(requestData) {
 function executeFluxQuery(requestData, cb) {
   const dbConfig = requestData.dbConfig;
   const query = requestData.query;
-  const options = {
-    hostname: dbConfig.host,
-    port: dbConfig.port,
-    path: '/api/v2/query',
-    method: 'POST',
-    headers: {
-      'Accept': 'application/csv',
-      'Content-Type': 'application/vnd.flux',
-      'Content-Length': Buffer.byteLength(query)
-    }
-  }
-  http.request(options, res => {
-      let data = ""
-      res.on("data", d => {
-        data += d
-      })
-      res.on("end", () => {
-        cb({
-          status: true,
-          content: data
+  getPasswordValue(dbConfig, (updatedDBConfig) => {
+    if (updatedDBConfig) {
+      const options = {
+        hostname: updatedDBConfig.host,
+        port: updatedDBConfig.port,
+        path: '/api/v2/query',
+        method: 'POST',
+        headers: {
+          'Accept': 'application/csv',
+          'Content-Type': 'application/vnd.flux',
+          'Content-Length': Buffer.byteLength(query)
+        }
+      }
+      http.request(options, res => {
+        let data = ""
+        res.on("data", d => {
+          data += d
         })
-      })
-    }).on("error", (err) => {
-      cb({
-        status: false,
-        error: err
-      })
-    }).end(query);
+        res.on("end", () => {
+          cb({
+            status: true,
+            content: data
+          })
+        })
+      }).on("error", (err) => {
+        cb({
+          status: false,
+          error: err
+        })
+      }).end(query);
+    }
+  })
 }
 
 function executeFluxQueryPromise(requestData) {
@@ -474,10 +597,10 @@ module.exports = {
   executeFluxQuery: executeFluxQuery,
   promise: {
     executeRawQuery: executeRawQueryPromise,
-    executeQuery:executeQueryPromise,
-    flushCache:flushCache,
-    executeQueryStream:executeQueryStreamPromise,
-    executeRawQueriesWithConnection:executeRawQueriesWithConnectionPromise,
+    executeQuery: executeQueryPromise,
+    flushCache: flushCache,
+    executeQueryStream: executeQueryStreamPromise,
+    executeRawQueriesWithConnection: executeRawQueriesWithConnectionPromise,
     executeFluxQuery: executeFluxQueryPromise
   }
 };
