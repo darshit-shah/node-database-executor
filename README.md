@@ -1,3 +1,5 @@
+[![Node.js Package](https://github.com/darshit-shah/node-database-executor/actions/workflows/npm-publish.yml/badge.svg?branch=master&event=release)](https://github.com/darshit-shah/node-database-executor/actions/workflows/npm-publish.yml)
+
 # node-database-executor
 
 This module use for execute jsonQuery or rawQuery using your database config.
