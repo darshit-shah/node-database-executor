@@ -21,8 +21,5 @@
     "axiom-utils": "*",
     "@aws-sdk/client-secrets-manager": "3.350.0"
   },
-  "homepage": "https://github.com/darshit-shah/node-database-executor#readme",
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com/darshit-shah"
-  }
+  "homepage": "https://github.com/darshit-shah/node-database-executor#readme"
 }
