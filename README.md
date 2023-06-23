@@ -1,6 +1,5 @@
 [![CodeQL](https://github.com/darshit-shah/node-database-executor/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/darshit-shah/node-database-executor/actions/workflows/github-code-scanning/codeql)
-
-[![Node.js Package](https://github.com/darshit-shah/node-database-executor/actions/workflows/npm-publish.yml/badge.svg)](https://github.com/darshit-shah/node-database-executor/actions/workflows/npm-publish.yml)
+[![Node.js Package](https://github.com/darshit-shah/node-database-executor/actions/workflows/npm-publish.yml/badge.svg?event=release)](https://github.com/darshit-shah/node-database-executor/actions/workflows/npm-publish.yml)
 
 # node-database-executor
 
