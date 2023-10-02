@@ -4,7 +4,6 @@ const databaseExecutor = require('./ConnectorIdentifier.js');
 const axiomUtils = require('axiom-utils');
 const http = require('http');
 const { SecretsManagerClient, ListSecretsCommand, GetSecretValueCommand } = require("@aws-sdk/client-secrets-manager");
-const listSecretsCommand = new ListSecretsCommand({});
 const dbPasswordMapping = {}
 
 if (global._connectionPools == null) {
@@ -12,28 +11,26 @@ if (global._connectionPools == null) {
 }
 const oldResults = {};
 
-function getPasswordFromAwsSecretsManager(secretName, accessKey, secretKey, cb) {
+function getPasswordFromAwsSecretsManager(secretName, accessKey, secretKey, region, cb) {
   const awsSecretsManagerClient = new SecretsManagerClient({
+    region: region,
     credentials: {
       accessKeyId: accessKey,
       secretAccessKey: secretKey,
     },
   });
-  awsSecretsManagerClient.send(listSecretsCommand, (err, data) => {
-    if (data) {
-      let response = data.SecretList.find(d => d.Name == secretName)
-      const getSecretValueCommand = new GetSecretValueCommand({
-        SecretId: response.Name
-      });
-      awsSecretsManagerClient.send(getSecretValueCommand, (err, data) => {
-        if (data) {
-          let secretValue = data
-          secretValue = secretValue.SecretString;
-          cb(secretValue);
-        }
-      })
-    }
+  const getSecretValueCommand = new GetSecretValueCommand({
+    SecretId: secretName
   });
+  awsSecretsManagerClient.send(getSecretValueCommand, (err, data) => {
+    if (err != null) {
+      console.error(err)
+    } else {
+      let secretValue = data
+      secretValue = secretValue.SecretString;
+      cb(secretValue);
+    }
+  })
 }
 
 function isValidJSON(inputString) {
@@ -57,12 +54,13 @@ function getPasswordValue(dbConfig, cb) {
         let type = keyVault[vaultIdentifier] && keyVault[vaultIdentifier].type;
         const accessKey = keyVault[vaultIdentifier].accessKey;
         const secretKey = keyVault[vaultIdentifier].secretKey;
+        const region = keyVault[vaultIdentifier].region;
         if (type === "awsKeyVault") {
           if (dbPasswordMapping[type] && dbPasswordMapping[type][vaultIdentifier] && dbPasswordMapping[type][vaultIdentifier][secretName] && dbPasswordMapping[type][vaultIdentifier][secretName].password) {
             dbConfigCopy.password = dbPasswordMapping[type][vaultIdentifier][secretName].password
             cb(dbConfigCopy)
           } else {
-            getPasswordFromAwsSecretsManager(secretName, accessKey, secretKey, (result) => {
+            getPasswordFromAwsSecretsManager(secretName, accessKey, secretKey, region, (result) => {
               if (result) {
                 dbConfigCopy.password = result
                 dbPasswordMapping[type] = { [vaultIdentifier]: { [secretName]: { password: result } } }
@@ -458,51 +456,27 @@ function executeRawQueriesWithConnection(requestData, cb) {
   try {
     const dbConfig = axiomUtils.extend({}, true, requestData.dbConfig);
     const rawQueries = requestData.rawQueries;
-    const objConnection = databaseConnector.identify(dbConfig);
-    const keyVault = JSON.parse(process.env.key_Vault);
-    const vaultName = dbConfig.password.vaultName;
-    const secretName = dbConfig.password.secretName;
-    const type = keyVault[vaultName] && keyVault[vaultName].type;
-    if (typeof (dbConfig.password) === "object" && secretName && vaultName && dbPasswordMapping[type] && dbPasswordMapping[type][vaultName] && dbPasswordMapping[type][vaultName][secretName] && process.env.key_Vault) {
-      dbConfig.password = dbPasswordMapping[type][vaultName][secretName].password
-      objConnection.connect(dbConfig, function (err, connection) {
-        if (err != undefined) {
-          console.log('connection error: ', err);
-          const e = err;
-          //e.exception=ex;
-          cb({
-            status: false,
-            error: e
-          });
-        } else {
-          executeRawQueriesWithSpecificConnection(dbConfig, connection, rawQueries, function (allErrs, allResults, allFields) {
-            objConnection.disconnect(connection);
-            cb(allErrs, allResults, allFields);
-          });
-        }
-      });
-    } else {
-      getPasswordValue(dbConfig, (updatedDBConfig) => {
-        if (updatedDBConfig) {
-          objConnection.connect(updatedDBConfig, function (err, connection) {
-            if (err != undefined) {
-              console.log('connection error: ', err);
-              const e = err;
-              //e.exception=ex;
-              cb({
-                status: false,
-                error: e
-              });
-            } else {
-              executeRawQueriesWithSpecificConnection(updatedDBConfig, connection, rawQueries, function (allErrs, allResults, allFields) {
-                objConnection.disconnect(connection);
-                cb(allErrs, allResults, allFields);
-              });
-            }
-          });
-        }
-      })
-    }
+    getPasswordValue(dbConfig, (updatedDBConfig) => {
+      if (updatedDBConfig) {
+        const objConnection = databaseConnector.identify(updatedDBConfig);
+        objConnection.connect(updatedDBConfig, function (err, connection) {
+          if (err != undefined) {
+            console.log('connection error: ', err);
+            const e = err;
+            //e.exception=ex;
+            cb({
+              status: false,
+              error: e
+            });
+          } else {
+            executeRawQueriesWithSpecificConnection(updatedDBConfig, connection, rawQueries, function (allErrs, allResults, allFields) {
+              objConnection.disconnect(connection);
+              cb(allErrs, allResults, allFields);
+            });
+          }
+        });
+      }
+    })
   } catch (ex) {
     console.log('exception: ', ex);
     const e = ex;
