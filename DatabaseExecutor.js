@@ -333,7 +333,10 @@ function executeRawQueryInner(dbConfig, rawQuery, shouldCache, tableName, cb) {
 function getConnectionFromPool(dbConfig, cb) {
   try {
     const connectionString = dbConfig.databaseType + '://' + dbConfig.user + ':' + dbConfig.password + '@' + dbConfig.host + ':' + dbConfig.port + '/' + dbConfig.database;
-    if (global._connectionPools.hasOwnProperty(connectionString)) {
+    // CHeck if expiresOnTimestamp exists & if its less then current timestamp
+    // else fecth new instance of pool/connection  
+    if (global._connectionPools.hasOwnProperty(connectionString) && (!global._connectionPools[connectionString]["config"]["expiresOnTimestamp"] || 
+      global._connectionPools[connectionString]["config"]["expiresOnTimestamp"] > new Date().valueOf() ) ) {
       cb({
         status: true,
         content: global._connectionPools[connectionString]
