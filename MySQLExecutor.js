@@ -1,9 +1,13 @@
 var debug = require('debug')('database-executor:mysql-executor');
 function executeQuery(connection, rawQuery, cb) {
   if (rawQuery.length <= 100000000) {
-    debug('query: %s', rawQuery);
+    if(connection?.debug !== false){
+      debug('query: %s', rawQuery);
+    }
   } else {
-    debug('query: %s', rawQuery.substring(0, 500) + "\n...\n" + rawQuery.substring(rawQuery.length - 500, rawQuery.length));
+    if(connection?.debug !== false){
+      debug('query: %s', rawQuery.substring(0, 500) + "\n...\n" + rawQuery.substring(rawQuery.length - 500, rawQuery.length));
+    }
   }
   connection.query(rawQuery, function(err, results) {
     if (err) {
