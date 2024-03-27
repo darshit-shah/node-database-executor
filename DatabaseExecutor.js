@@ -335,7 +335,7 @@ function getConnectionFromPool(dbConfig, cb) {
     const connectionString = dbConfig.databaseType + '://' + dbConfig.user + ':' + dbConfig.password + '@' + dbConfig.host + ':' + dbConfig.port + '/' + dbConfig.database;
     // CHeck if expiresOnTimestamp exists & if its less then current timestamp
     // else fecth new instance of pool/connection  
-    if (global._connectionPools.hasOwnProperty(connectionString) && (!global._connectionPools[connectionString]["config"]["expiresOnTimestamp"] || 
+    if (global._connectionPools.hasOwnProperty(connectionString) && (!global._connectionPools[connectionString].hasOwnProperty("config") || !global._connectionPools[connectionString]["config"]["expiresOnTimestamp"] || 
       global._connectionPools[connectionString]["config"]["expiresOnTimestamp"] > new Date().valueOf() ) ) {
       cb({
         status: true,
