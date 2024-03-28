@@ -114,6 +114,7 @@ function executeRawQueryWithConnection(dbConfig, rawQuery, cb) {
         });
       } else {
         const objExecutor = databaseExecutor.identify(dbConfig);
+        connection.debug = dbConfig.debug;
         objExecutor.executeQuery(connection, rawQuery, function (result) {
           if (result.status == false) {
             console.log('DB Executor Error', dbConfig, rawQuery);
@@ -262,18 +263,25 @@ function executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb) {
         const connection = result.content;
         if (dbConfig.databaseType != null && dbConfig.databaseType.toString().toLowerCase() != 'json') {
           if (rawQuery.length <= 100000000) {
-            debug('query: %s', rawQuery);
+            if(dbConfig.debug !==false){
+              debug('query: %s', rawQuery);
+            }
           } else {
-            debug('query: %s', rawQuery.substring(0, 500) + '\n...\n' + rawQuery.substring(rawQuery.length - 500, rawQuery.length));
+            if(dbConfig.debug !==false){
+                debug('query: %s', rawQuery.substring(0, 500) + '\n...\n' + rawQuery.substring(rawQuery.length - 500, rawQuery.length));
+            }  
           }
         }
         const queryStartTime = new Date();
         const objExecutor = databaseExecutor.identify(dbConfig);
+        connection.debug = dbConfig.debug;
         objExecutor.executeQuery(connection, rawQuery, function (result) {
           if (result.status == false) {
             console.log('DB Executor Error', dbConfig, rawQuery);
           }
-          debug('Total Time:', (new Date().getTime() - startTime.getTime()) / 1000, 'Query Time:', (new Date().getTime() - queryStartTime.getTime()) / 1000);
+          if(dbConfig.debug !==false){
+            debug('Total Time:', (new Date().getTime() - startTime.getTime()) / 1000, 'Query Time:', (new Date().getTime() - queryStartTime.getTime()) / 1000);
+          }
           cb(result);
         });
       }
@@ -440,6 +448,7 @@ function executeRawQueriesWithSpecificConnection(dbConfig, connection, queries, 
       cb(allErrs, allResults, allFields);
       return;
     }
+    connection.debug = dbConfig.debug;
     objExecutor.executeQuery(connection, queries[index], function (result) {
       if (result.status) {
         allErrs.push(null);
