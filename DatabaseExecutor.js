@@ -115,6 +115,10 @@ function executeRawQueryWithConnection(dbConfig, rawQuery, cb) {
       } else {
         const objExecutor = databaseExecutor.identify(dbConfig);
         connection.debug = dbConfig.debug;
+        if(typeof rawQuery !== 'string' && dbConfig.databaseType === "mysql"){
+          const filePath = rawQuery.filepath
+          connection.config.infileStreamFactory = () => fs.createReadStream(filePath)
+        }
         objExecutor.executeQuery(connection, rawQuery, function (result) {
           if (result.status == false) {
             console.log('DB Executor Error', dbConfig, rawQuery);
@@ -449,7 +453,13 @@ function executeRawQueriesWithSpecificConnection(dbConfig, connection, queries, 
       return;
     }
     connection.debug = dbConfig.debug;
-    objExecutor.executeQuery(connection, queries[index], function (result) {
+    let localQuery = queries[index];
+    if(typeof localQuery !== 'string' && dbConfig.databaseType === "mysql"){
+      const filePath = localQuery.filepath
+      connection.config.infileStreamFactory = () => fs.createReadStream(filePath)
+    }
+    
+    objExecutor.executeQuery(connection, localQuery, function (result) {
       if (result.status) {
         allErrs.push(null);
         allResults.push(result.content);
