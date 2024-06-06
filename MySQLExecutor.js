@@ -13,11 +13,11 @@ function executeQuery(connection, rawQuery, cb) {
   } else {
     if (rawQuery.sql && rawQuery.sql.length <= 100000000) {
       if(connection?.debug !== false){
-        debug('query: %s', rawQuery);
+        debug('query: %s', rawQuery.sql);
       }
     } else {
         if(connection?.debug !== false && rawQuery.sql && rawQuery.sql.length){
-          debug('query: %s', rawQuery.substring(0, 500) + "\n...\n" + rawQuery.substring(rawQuery.length - 500, rawQuery.length));
+          debug('query: %s', rawQuery.sql.substring(0, 500) + "\n...\n" + rawQuery.sql.substring(rawQuery.sql.length - 500, rawQuery.sql.length));
         }
     }
   }
