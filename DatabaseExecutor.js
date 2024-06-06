@@ -268,17 +268,29 @@ function executeRawQueryWithConnectionPool(dbConfig, rawQuery, cb) {
         if (dbConfig.databaseType != null && dbConfig.databaseType.toString().toLowerCase() != 'json') {
           if (rawQuery.length <= 100000000) {
             if(dbConfig.debug !==false){
-              debug('query: %s', rawQuery);
-            }
+              if(typeof rawQuery === "string" ){
+                debug('query: %s', rawQuery);
+              } else {
+                debug('query: %s', rawQuery.sql);
+              }
+            } 
           } else {
             if(dbConfig.debug !==false){
+              if(typeof rawQuery === "string"){
                 debug('query: %s', rawQuery.substring(0, 500) + '\n...\n' + rawQuery.substring(rawQuery.length - 500, rawQuery.length));
-            }  
+              } else {
+                debug('query: %s', rawQuery.sql.substring(0, 500) + '\n...\n' + rawQuery.sql.substring(rawQuery.sql.length - 500, rawQuery.sql.length));
+              }
+            }
           }
         }
         const queryStartTime = new Date();
         const objExecutor = databaseExecutor.identify(dbConfig);
         connection.debug = dbConfig.debug;
+        if(typeof rawQuery !== 'string' && dbConfig.databaseType === "mysql"){
+          const filePath = rawQuery.filepath
+          connection.config.connectionConfig.infileStreamFactory = () => fs.createReadStream(filePath)
+        }
         objExecutor.executeQuery(connection, rawQuery, function (result) {
           if (result.status == false) {
             console.log('DB Executor Error', dbConfig, rawQuery);
