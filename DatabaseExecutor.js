@@ -4,6 +4,8 @@ const databaseExecutor = require('./ConnectorIdentifier.js');
 const axiomUtils = require('axiom-utils');
 const http = require('http');
 const { SecretsManagerClient, ListSecretsCommand, GetSecretValueCommand } = require("@aws-sdk/client-secrets-manager");
+const { DefaultAzureCredential } = require("@azure/identity");
+const { SecretClient } = require("@azure/keyvault-secrets");
 const dbPasswordMapping = {}
 
 if (global._connectionPools == null) {
@@ -32,7 +34,19 @@ function getPasswordFromAwsSecretsManager(secretName, accessKey, secretKey, regi
     }
   })
 }
+function getPasswordFromAzureSecretManager(vaultName,secretName,cb){
+    const credential = new DefaultAzureCredential();
+    const url = `https://${vaultName}.vault.azure.net`;
+    const client = new SecretClient(url, credential);
+    client
+    .getSecret(secretName)
+    .then((latestSecret) => {
+      cb(null,latestSecret.value);
 
+    }).catch((err) => {
+      cb('Fetching Secret key Failed',err.message);
+    });
+}
 function isValidJSON(inputString) {
   try {
     JSON.parse(inputString);
@@ -68,6 +82,17 @@ function getPasswordValue(dbConfig, cb) {
               }
             });
           }
+        }else if(type==="azureKeyVault"){
+            getPasswordFromAzureSecretManager(vaultIdentifier,secretName,(err,result) => {
+              if(err!=null){
+                console.log(err);
+              }
+              else if (result) {
+                dbConfigCopy.password = result
+                dbPasswordMapping[type] = { [vaultIdentifier]: { [secretName]: { password: result } } }
+                cb(dbConfigCopy);
+              }
+            });
         }
       }
       catch (error) {
