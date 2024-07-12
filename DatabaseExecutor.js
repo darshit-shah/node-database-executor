@@ -13,7 +13,7 @@ if (global._connectionPools == null) {
 }
 const oldResults = {};
 
-function getPasswordFromAwsSecretsManager(secretName, accessKey, secretKey, region, cb) {
+function getPasswordFromAwsSecretsManager(secretName, accessKey, secretKey, region, secretStringType, cb) {
   const awsSecretsManagerClient = new SecretsManagerClient({
     region: region,
     credentials: {
@@ -28,8 +28,13 @@ function getPasswordFromAwsSecretsManager(secretName, accessKey, secretKey, regi
     if (err != null) {
       console.error(err)
     } else {
-      let secretValue = data
-      secretValue = secretValue.SecretString;
+      let secretValue = data;
+      if(secretStringType != "" && secretStringType == 'object') {
+        secretValue = JSON.parse(secretValue.SecretString);
+        secretValue = secretValue.password;
+      } else {
+        secretValue = secretValue.SecretString;
+      }
       cb(secretValue);
     }
   })
@@ -69,12 +74,13 @@ function getPasswordValue(dbConfig, cb) {
         const accessKey = keyVault[vaultIdentifier].accessKey;
         const secretKey = keyVault[vaultIdentifier].secretKey;
         const region = keyVault[vaultIdentifier].region;
+        const secretStringType = passwordConfig.secretStringType ? passwordConfig.secretStringType : "";
         if (type === "awsKeyVault") {
           if (dbPasswordMapping[type] && dbPasswordMapping[type][vaultIdentifier] && dbPasswordMapping[type][vaultIdentifier][secretName] && dbPasswordMapping[type][vaultIdentifier][secretName].password) {
             dbConfigCopy.password = dbPasswordMapping[type][vaultIdentifier][secretName].password
             cb(dbConfigCopy)
           } else {
-            getPasswordFromAwsSecretsManager(secretName, accessKey, secretKey, region, (result) => {
+            getPasswordFromAwsSecretsManager(secretName, accessKey, secretKey, region,secretStringType, (result) => {
               if (result) {
                 dbConfigCopy.password = result
                 dbPasswordMapping[type] = { [vaultIdentifier]: { [secretName]: { password: result } } }
