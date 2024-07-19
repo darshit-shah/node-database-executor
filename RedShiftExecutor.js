@@ -52,8 +52,8 @@ function executeQuery(connection, rawQuery, cb) {
             cb({
               status: true,
               content: results && results.rows ? results.rows.map(d => {
-                return (!Array.isArray(d) ? __convertToCaseInsensitiveAndNumberIfPossible(d) : d.map(innerD => {
-                  return __convertToCaseInsensitiveAndNumberIfPossible(innerD);
+                return (!Array.isArray(d) ? __convertToCaseInsensitiveAndNumberIfPossible(d, results.fields) : d.map(innerD => {
+                  return __convertToCaseInsensitiveAndNumberIfPossible(innerD, results.fields);
                 }));
               }) : []
             });
@@ -74,8 +74,8 @@ function executeQuery(connection, rawQuery, cb) {
         cb({
           status: true,
           content: results && results.rows ? results.rows.map(d => {
-            return (!Array.isArray(d) ? __convertToCaseInsensitiveAndNumberIfPossible(d) : d.map(innerD => {
-              return __convertToCaseInsensitiveAndNumberIfPossible(innerD);
+            return (!Array.isArray(d) ? __convertToCaseInsensitiveAndNumberIfPossible(d, results.fields) : d.map(innerD => {
+              return __convertToCaseInsensitiveAndNumberIfPossible(innerD, results.fields);
             }));
           }) : []
         });
@@ -111,9 +111,14 @@ function executeQueryStream(connection, query, onResultFunction, cb) {
     });
 }
 
-function __convertToCaseInsensitiveAndNumberIfPossible(row) {
-  Object.keys(row).forEach((column) => { row[column] = axiom_utils.convertToNumericIfPossible(row[column]); });
-  return axiom_utils.convertObjectKeysCaseInsensitive(row);
+function __convertToCaseInsensitiveAndNumberIfPossible(row, fields) { 
+    Object.keys(row).forEach((column) => { 
+        let field = fields && fields.filter(i => i.name == column); 
+        if(field && field.length && [1700,700,701,23,21,16,20].includes(field[0].dataTypeID) ){ 
+            row[column] = axiom_utils.convertToNumericIfPossible(row[column]); 
+        } 
+    }); 
+    return axiom_utils.convertObjectKeysCaseInsensitive(row); 
 }
 
 module.exports = {
