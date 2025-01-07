@@ -13,6 +13,8 @@ function identifyConnection(json) {
       objConnection = require('./MySQLExecutor.js');
     } else if (json.databaseType == "mssql") {
       objConnection = require('./MSSQLExecutor.js');
+    }else if (json.databaseType == "postgres") {
+      objConnection = require('./PostgresExecutor.js');
     } else if (json.databaseType == "cassandra") {
       objConnection = require('./CassandraExecutor.js');
     } else if (json.databaseType == "clickhouse") {
