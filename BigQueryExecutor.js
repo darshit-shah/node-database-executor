@@ -50,6 +50,10 @@ function __processResult(postResult) {
             );
             throw new Error("Object recived with unexpected type");
           }
+        } else if (row[prop].constructor.name === "Big") {
+          // for decimal value formatting
+          // from Big {s: 1, e: 0, c: Array(1), constructor: ƒ} to float
+          row[prop] = parseFloat(row[prop].toString());
         } else {
           console.log("Object recived expecting a value property :", row[prop]);
           throw new Error("Expecting Value inside object.");
